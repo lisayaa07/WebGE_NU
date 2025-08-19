@@ -1,0 +1,6 @@
+#เปิดหน้าweb
+npm run dev 
+
+#Extension
+Tailwind CSS IntelliSense
+Vue (Official)
