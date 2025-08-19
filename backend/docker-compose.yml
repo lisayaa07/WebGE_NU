@@ -1,0 +1,28 @@
+version: "3.9"
+
+services:
+  php-apache:
+    build:
+      dockerfile: Dockerfile
+    volumes:
+      - ./src/frontend/:/var/www/html/
+    ports:
+      - "8080:80"
+    networks:
+      - my-network
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    environment:
+      - PMA_HOST=${DB_HOST}
+      - PMA_PORT=${DB_PORT}
+      - PMA_USER=${DB_USER}
+      - PMA_PASSWORD=${DB_PASSWORD}
+    ports:
+      - "8000:80"
+    networks:
+      - my-network
+
+networks:
+  my-network:
+    driver: bridge
