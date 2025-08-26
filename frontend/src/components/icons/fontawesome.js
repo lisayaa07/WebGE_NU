@@ -1,5 +1,7 @@
 import { library } from '@fortawesome/fontawesome-svg-core'
 import * as solidIcons from '@fortawesome/free-solid-svg-icons'
+import * as regularIcons from '@fortawesome/free-regular-svg-icons'
+import { faHeart as faHeartRegular } from '@fortawesome/free-regular-svg-icons'
 
 const iconNames = [
   'heart-circle-check',
@@ -12,6 +14,10 @@ const iconNames = [
   'truck-fast',
   'bars',
   'chevron-down'
+]
+
+const iconNameRegular = [
+  'heart'
 ]
 
 function toPascalCaseIconName(name) {
@@ -30,3 +36,5 @@ iconNames.forEach(iconName => {
     console.warn(`[FontAwesome] ไม่พบไอคอน: ${faIconName}`)
   }
 })
+
+library.add(faHeartRegular)

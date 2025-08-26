@@ -23,13 +23,12 @@ const time = ref([])
 
 // ตัวแปรที่ผูกกับ v-model
 const studentId = ref('')
-const selectedStudentLevel = ref('null') 
-const selectedFaculty = ref('null')
+const selectedFaculty = ref('')
 const selectedGrade = ref('')
 const selectedInterestd = ref([])
 const selectedSubjectGroup = ref('')
 const selectedSubject = ref('')
-const selectedGroupwork = ref('')
+const selectedgroupwork = ref('')
 const selectedsolowork = ref('')
 const selectedexam = ref('')
 const selectedattendance = ref('')
@@ -39,10 +38,8 @@ const selectedexperience = ref('')
 const selectedchallenge = ref('')
 const selectedtime = ref('')
 
-const reviewText = ref('')
-
 function isNumberOnly(event) { 
-    if (!/[0-9]/.test(event.key)) {
+    if (!/[0-8]/.test(event.key)) {
         event.preventDefault()
     }
 }
@@ -104,137 +101,42 @@ onMounted(async () => {
     experience.value = await expRes.json()
     challenge.value = await cRes.json()
     time.value = await tRes.json()
-
-    const sid = localStorage.getItem('userId');
-    const lvl = localStorage.getItem('studentLevel');
-    const fac = localStorage.getItem('facultyId');
-
-    if (sid) studentId.value = sid;
-    selectedStudentLevel.value = lvl ? Number(lvl) : null
-    selectedFaculty.value      = fac ? Number(fac) : null
-
-    selectedStudentLevel.value = localStorage.getItem('studentLevel') || ''
-    selectedFaculty.value      = localStorage.getItem('facultyId') || ''
   } catch (err) {
     console.error("โหลดข้อมูลไม่สำเร็จ:", err)
   }
 })
 
 
-// ====== ส่งฟอร์มเข้า /submit-form ======
-async function onSubmit (e) {
-  e.preventDefault()
-
-  // ตรวจง่าย ๆ
-  if (!studentId.value) return alert('กรุณากรอกรหัสนิสิต')
-  if (!selectedStudentLevel.value) return alert('กรุณาเลือกชั้นปี')
-  if (!selectedFaculty.value) return alert('กรุณาเลือกคณะ')
-  if (!selectedGroupType.value) return alert('กรุณาเลือกหมวดวิชา')
-  if (!selectedSubject.value) return alert('กรุณาเลือกรายวิชา')
-
-  // เตรียม payload ให้ตรงกับ backend
-  const payload = {
-    student_id:    studentId.value,
-    subjectGroup:  selectedGroupType.value,
-    student_level: selectedStudentLevel.value,
-    faculty:       selectedFaculty.value,
-    interestd:     selectedInterestd.value,   // backend รวมเป็น comma ให้เอง
-    subject:       selectedSubject.value,
-
-    groupwork:     selectedGroupwork.value,
-    solowork:      selectedsolowork.value,
-    exam:          selectedexam.value,
-    attendance:    selectedattendance.value,
-    instruction:   selectedinstruction.value,
-    present:       selectedpresent.value,
-    experience:    selectedexperience.value,
-    challenge:     selectedchallenge.value,
-    time:          selectedtime.value,
-
-    grade:         selectedGrade.value,
-    review:        reviewText.value
-  }
-
-  try {
-    const res = await fetch('http://localhost:3000/submit-form', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    })
-
-    const text = await res.text()
-    if (!res.ok) {
-      console.error('submit-form failed:', text)
-      return alert('บันทึกไม่สำเร็จ: ' + text)
-    }
-
-    alert('บันทึกสำเร็จ 🎉')
-    // จะ reset ฟอร์มไหม? ถ้าต้องการ uncomment ข้างล่าง
-    // resetForm()
-  } catch (err) {
-    console.error('submit error:', err)
-    alert('เกิดข้อผิดพลาดระหว่างบันทึก')
-  }
-}
-
-//(ถ้าต้องการ reset)
-function resetForm () {
-  studentId.value = ''
-  selectedStudentLevel.value = ''
-  selectedFaculty.value = ''
-  selectedInterestd.value = []
-  selectedGroupType.value = ''
-  selectedSubject.value = ''
-  selectedGroupwork.value = ''
-  selectedsolowork.value = ''
-  selectedexam.value = ''
-  selectedattendance.value = ''
-  selectedinstruction.value = ''
-  selectedpresent.value = ''
-  selectedexperience.value = ''
-  selectedchallenge.value = ''
-  selectedtime.value = ''
-  selectedGrade.value = ''
-  reviewText.value = ''
-}
-
 
 </script>
 
 <template>
     <Layout>
-        <form class="p-6 space-y-6" @submit="onSubmit">
-
+        <form class="p-6 space-y-6">
             <div class="flex gap-10">
                 <fieldset class="fieldset">
                     <legend class="fieldset-legend text-lg">รหัสนิสิต</legend>
-                    <input type="text"
-                            v-model="studentId"
-                            class="input input-error"
-                            placeholder="กรอกรหัสนิสิต" />
-                    </fieldset>
+                    <input type="text" v-model="studentId" maxlength="8" @keypress="isNumberOnly"
+                        class="input input-error" placeholder="กรอกรหัสนิสิต" />
+                </fieldset>
 
-                <!-- ชั้นปี -->
                 <fieldset class="fieldset">
                     <legend class="fieldset-legend text-lg">ชั้นปี</legend>
-                    <select class="select select-error"
-                            v-model="selectedStudentLevel">
-                        <option disabled value="">เลือกชั้นปี</option>
-                        <option value="1">1</option>
-                        <option value="2">2</option>
-                        <option value="3">3</option>
-                        <option value="4">4</option>
+                    <select class="select select-error">
+                        <option disabled selected>เลือกชั้นปี</option>
+                        <option>1</option>
+                        <option>2</option>
+                        <option>3</option>
+                        <option>4</option>
                     </select>
-                    </fieldset>
+                </fieldset>
 
-              <!-- คณะ -->
-                <fieldset class="fieldset">
+               <fieldset class="fieldset">
                     <legend class="fieldset-legend text-lg">คณะ</legend>
-                    <select class="select select-error"
-                            v-model="selectedFaculty">
+                    <select class="select select-error" v-model="selectedFaculty">
                         <option disabled value="">เลือกคณะ</option>
-                        <option v-for="f in faculties" :key="f.faculty_ID" :value="f.faculty_ID">
-                        {{ f.faculty_Name }}
+                        <option v-for="faculty in faculties" :key="faculty.faculty_ID" :value="faculty.faculty_ID">
+                        {{ faculty.faculty_Name }}
                         </option>
                     </select>
                     </fieldset>
@@ -403,7 +305,7 @@ function resetForm () {
                         type="radio"
                         class="radio radio-sm radio-error bg-white/50"
                         name="instruction"
-                        :value="item.instruction_ID"
+                        :value="item.instruction_Id"
                         v-model="selectedinstruction"
                         >
                             {{ item.instruction_Name}}
@@ -464,12 +366,12 @@ function resetForm () {
                         <label 
                             class="block"
                             v-for="item in challenge"
-                            :key="item.challenge_ID"
+                            :key="item. challenge_ID"
                         >
                         <input
                         type="radio"
                         class="radio radio-sm radio-error bg-white/50"
-                        name="challenge"
+                        name=" challenge"
                         :value="item.challenge_ID"
                         v-model="selectedchallenge"
                         >
@@ -490,7 +392,7 @@ function resetForm () {
                         >
                         <input
                         type="radio"
-                        class="radio radio-sm radio-error bg-white/50"
+                        class=""
                         name="time"
                         :value="item.time_ID"
                         v-model="selectedtime"
@@ -504,8 +406,7 @@ function resetForm () {
             <div class="bg-[#FFAE00]/35 p-6 rounded-3xl">
                 <fieldset class="fieldset">
                     <legend class="fieldset-legend text-lg">ความรู้สึกที่มีต่อรายวิชานี้</legend>
-                    <textarea v-model="reviewText" class="textarea textarea-warning h-24 w-full" placeholder="กรุณากรอกความรู้สึก"></textarea>
-
+                    <textarea class="textarea textarea-warning h-24 w-full" placeholder="กรุณากรอกความรู้สึก"></textarea>
                 </fieldset>
             </div>
 

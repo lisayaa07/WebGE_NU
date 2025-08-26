@@ -76,6 +76,7 @@ app.get("/subjects/:groupId", (req, res) => {
 
 // ✅ API ดึงข้อมูลความสนใจ
 app.get("/interestd", (req, res) => {
+  console.log("📡 ถูกเรียก /interestd");
   const sql = "SELECT interest_ID, interest_Name FROM Interestd";
   connection.query(sql, (err, results) => {
     if (err) {
@@ -194,7 +195,6 @@ app.get("/time", (req, res) => {
   });
 });
 
-
 app.post("/submit-form", (req, res) => {
   console.log("📦 ฟอร์มที่รับมา:", req.body);
   const {
@@ -278,11 +278,485 @@ app.post("/submit-form", (req, res) => {
         return res.status(500).send("Insert Form_review failed");
       }
 
-     res.send("✅ ข้อมูลถูกบันทึกเรียบร้อยแล้ว");
+      res.send("✅ ข้อมูลถูกบันทึกเรียบร้อยแล้ว");
     });
   });
 });
 
+
+// ✅ API ล็อกอิน
+const bcrypt = require('bcryptjs');
+
+app.post('/login', (req, res) => {
+  const { id, password } = req.body;
+  if (!id || !password) {
+    return res.status(400).json({ ok: false, message: 'กรอก ID และ Password' });
+  }
+
+  const sql = `
+    SELECT
+      u.user_id,
+      u.password,
+      s.full_name,
+      s.student_level,
+      s.faculty_ID
+    FROM Users u
+    LEFT JOIN Student s ON s.student_id = u.user_id
+    WHERE u.user_id = ?
+    LIMIT 1
+  `;
+
+  connection.query(sql, [id], async (err, rows) => {
+    if (err) {
+      console.error('DB error:', err);
+      return res.status(500).json({ ok: false, message: 'Database Error' });
+    }
+    if (!rows.length) {
+      return res.status(401).json({ ok: false, message: 'ID หรือ Password ไม่ถูกต้อง' });
+    }
+
+    const row = rows[0];
+    const ok = await bcrypt.compare(password, row.password);
+    if (!ok) {
+      return res.status(401).json({ ok: false, message: 'ID หรือ Password ไม่ถูกต้อง' });
+    }
+
+    // ✅ สำเร็จ: ส่งโปรไฟล์กลับตัวเดียวพอ
+    return res.json({
+      ok: true,
+      user: {
+        id: row.user_id,
+        name: row.full_name || '',
+        student_level: row.student_level || '',
+        faculty_ID: row.faculty_ID || ''
+      }
+    });
+  });
+});
+
+
+
+// ===== สมัครบัญชี =====
+app.post('/register', (req, res) => {
+  const { student_id, password, full_name, student_level, faculty } = req.body;
+
+  // ตรวจ input
+  if (!student_id || !password || !full_name || !student_level || !faculty) {
+    return res.status(400).json({ ok: false, message: 'กรอกข้อมูลให้ครบ' });
+  }
+
+  // เช็คซ้ำว่ามี user/นิสิตนี้แล้วหรือยัง
+  const checkSql = `
+    SELECT
+      (SELECT COUNT(*) FROM Student WHERE student_id = ?) AS sCount,
+      (SELECT COUNT(*) FROM Users   WHERE user_id    = ?) AS uCount
+  `;
+  connection.query(checkSql, [student_id, student_id], async (err, rows) => {
+    if (err) {
+      console.error('DB error:', err);
+      return res.status(500).json({ ok: false, message: 'Database Error' });
+    }
+    const { sCount, uCount } = rows[0];
+    if (sCount > 0 || uCount > 0) {
+      return res.status(409).json({ ok: false, message: 'มีบัญชีนี้อยู่แล้ว' });
+    }
+
+    // ทำเป็น transaction
+    connection.beginTransaction(async (trErr) => {
+      if (trErr) {
+        console.error('beginTransaction error:', trErr);
+        return res.status(500).json({ ok: false, message: 'Transaction start failed' });
+      }
+
+      try {
+        // 1) แทรก Student
+        const insertStudent = `
+          INSERT INTO Student (student_id, full_name, student_level, faculty_ID)
+          VALUES (?, ?, ?, ?)
+        `;
+        connection.query(insertStudent, [student_id, full_name, student_level, faculty], async (iSErr) => {
+          if (iSErr) {
+            console.error('Insert Student error:', iSErr);
+            return connection.rollback(() => {
+              res.status(500).json({ ok: false, message: 'Insert Student failed' });
+            });
+          }
+
+          // 2) แทรก Users (เก็บรหัสผ่านแบบ hash)
+          const hash = await bcrypt.hash(password, 10);
+          const insertUser = `INSERT INTO Users (user_id, password) VALUES (?, ?)`;
+          connection.query(insertUser, [student_id, hash], (iUErr) => {
+            if (iUErr) {
+              console.error('Insert Users error:', iUErr);
+              return connection.rollback(() => {
+                res.status(500).json({ ok: false, message: 'Insert Users failed' });
+              });
+            }
+
+            connection.commit((cErr) => {
+              if (cErr) {
+                console.error('Commit error:', cErr);
+                return connection.rollback(() => {
+                  res.status(500).json({ ok: false, message: 'Commit failed' });
+                });
+              }
+              res.json({ ok: true, message: 'สมัครบัญชีสำเร็จ' });
+            });
+          });
+        });
+      } catch (e) {
+        console.error('Register catch error:', e);
+        return connection.rollback(() => {
+          res.status(500).json({ ok: false, message: 'Register failed' });
+        });
+      }
+    });
+  });
+});
+
+
+
+/* ---------- Case-based Reasoning ---------- */
+app.post('/cbr-match', (req, res) => {
+  const {
+    interestd = [],                         // เช่น [1,3,6] (จากฟอร์ม)
+    groupwork, solowork, exam, attendance, instruction,
+    present, experience, challenge, time, grade,
+    group_types = [],                       // กรองหมวดวิชา (อาจเป็นรหัสหรือเลขให้ตรง fr.group_type)
+    weights = {}
+  } = req.body;
+
+  const wantDebug = Boolean(req.body.debug) || process.env.DEBUG_CBR === '1'
+
+
+  // --- SQL (JOIN ชื่อกลุ่ม) ---
+  let sql = `
+    SELECT
+      fr.subject_ID,
+      s.subject_Name,
+      fr.group_type,
+      gt.GroupType_Name,
+      fr.groupwork_ID, fr.solowork_ID, fr.exam_ID, fr.attendance_ID,
+      fr.instruction_ID, fr.present_ID, fr.experience_ID, fr.challenge_ID,
+      fr.time_ID, fr.grade_ID, fr.review,
+      fg.interestd
+    FROM Form_review AS fr
+    JOIN Form_ge  AS fg ON fg.id = fr.fg_ID
+    LEFT JOIN Subject    AS s  ON s.subject_ID = fr.subject_ID
+    LEFT JOIN Group_Type AS gt ON gt.GroupType_ID = fr.group_type
+  `;
+  const params = [];
+
+  if (Array.isArray(group_types) && group_types.length) {
+    const placeholders = group_types.map(() => '?').join(',');
+    sql += ` WHERE fr.group_type IN (${placeholders})`;
+    params.push(...group_types);
+  }
+
+  connection.query(sql, params, (err, rows) => {
+    if (err) {
+      console.error('CBR SQL error:', err);
+      return res.status(500).json({ ok: false, message: 'Database Error' });
+    }
+
+    try {
+      // ---------- น้ำหนัก ----------
+      const W_default = {
+        interestd: 20,
+        exam: 15,
+        grade: 12,
+        instruction: 12,
+        groupwork: 10,
+        solowork: 10,
+        experience: 8,
+        challenge: 6,
+        time: 4,
+        attendance: 2,
+        present: 1,
+      };
+      // ถ้าหน้าเว็บส่ง weights มา จะ merge ทับค่า default
+      const W = { ...W_default, ...(weights || {}) };
+
+
+      // ---------- helpers ----------
+      // แปลง interest เป็น token ตัวเลขเสมอ: ['A1','F3',6] -> ['1','3','6']
+      function normalizeInterestTokens(value) {
+        if (value == null) return [];
+        const tokens = Array.isArray(value) ? value : String(value).split(',');
+        const out = tokens
+          .map(t => String(t).trim())
+          .filter(Boolean)
+          .map(t => {
+            const m = t.match(/\d+/);
+            if (!m) return null;
+            const n = parseInt(m[0], 10);       // <<— บังคับเป็นตัวเลข
+            return Number.isFinite(n) ? String(n) : null;
+          })
+          .filter(Boolean);
+        return [...new Set(out)]; // ตัดซ้ำ
+      }
+
+
+      // Dice ระหว่าง token (ข้ามมิตินี้ถ้า user หรือ case ว่าง)
+      function diceTokens(A, B) {
+        if (!Array.isArray(A) || !Array.isArray(B) || A.length === 0 || B.length === 0) return null;
+        const a = new Set(A), b = new Set(B);
+        const inter = [...a].filter(x => b.has(x)).length;
+        return (2 * inter) / (a.size + b.size);
+      }
+
+      function parseCodeLevel(v) {
+        if (v == null) return { prefix: null, level: null };
+        const s = String(v).trim();
+        // ถ้ากรอกมาเป็นเลขล้วน
+        if (/^\d+(\.\d+)?$/.test(s)) return { prefix: null, level: Number(s) };
+        const m = s.match(/^([A-Za-z]+)?\s*(\d+(?:\.\d+)?)$/);
+        if (!m) return { prefix: null, level: null };
+        return { prefix: (m[1] || '').toUpperCase(), level: Number(m[2]) };
+      }
+
+      function simCodeOrdinal(userVal, caseVal, { expectedPrefix = null, min = 1, max = 4, onPrefixMismatch = 'zero' } = {}) {
+        const u = parseCodeLevel(userVal);
+        const c = parseCodeLevel(caseVal);
+        if (expectedPrefix) {
+          const badU = u.prefix && u.prefix !== expectedPrefix;
+          const badC = c.prefix && c.prefix !== expectedPrefix;
+          if (badU || badC) return onPrefixMismatch === 'skip' ? null : 0;
+        }
+        if (!Number.isFinite(u.level) || !Number.isFinite(c.level)) return null; // ข้ามมิติถ้าข้อมูลไม่ครบ
+
+        const range = Number(max) - Number(min);
+        if (range <= 0) return u.level === c.level ? 1 : 0;
+
+        const diff = Math.abs(u.level - c.level) / range;
+        const sim = 1 - diff;
+        return Math.max(0, Math.min(1, sim));
+      }
+
+      // inverse-abs สำหรับสเกลลำดับ
+      const simInverseAbs = (a, b) => {
+        const an = Number(a), bn = Number(b);
+        if (!Number.isFinite(an) || !Number.isFinite(bn)) return null;
+        return 1 / (1 + Math.abs(an - bn));
+      };
+
+      function ensurePrefix(val, prefix) {
+        if (val == null) return null;
+        const s = String(val).trim();
+        if (/^\d+$/.test(s)) return prefix + s;   // "0" -> "C0"
+        return s;
+      }
+
+
+
+
+
+      // ---------- คำนวณแต่ละเคส ----------
+      const results = rows.map((r) => {
+        const userInterestTokens = normalizeInterestTokens(interestd);
+        const caseInterestTokens = normalizeInterestTokens(r.interestd);
+
+
+
+        // ถ้าคุณใช้รหัส B/C/D ให้เห็น level ที่แยกได้
+        const uGrade = parseCodeLevel(grade);
+        const cGrade = parseCodeLevel(r.grade_ID);
+        const uExam = parseCodeLevel(exam);
+        const cExam = parseCodeLevel(r.exam_ID);
+        const uInstr = parseCodeLevel(instruction);
+        const cInstr = parseCodeLevel(r.instruction_ID);
+
+        const sims = {
+          interestd: diceTokens(userInterestTokens, caseInterestTokens), // อาจเป็น null ถ้าฝั่งใดว่าง
+          groupwork: simInverseAbs(groupwork, r.groupwork_ID),
+          solowork: simInverseAbs(solowork, r.solowork_ID),
+          exam: simCodeOrdinal(ensurePrefix(exam, 'C'), r.exam_ID, { expectedPrefix: 'C', min: 0, max: 7 }),
+          attendance: simInverseAbs(attendance, r.attendance_ID),
+          instruction: simCodeOrdinal(instruction, r.instruction_ID, { expectedPrefix: 'D', min: 1, max: 3 }),
+          present: simInverseAbs(present, r.present_ID),
+          experience: simInverseAbs(experience, r.experience_ID),
+          challenge: simInverseAbs(challenge, r.challenge_ID),
+          time: simInverseAbs(time, r.time_ID), // 1..2 ก็ได้ 1/(1+|a-b|)
+          grade: simCodeOrdinal(grade, r.grade_ID, { expectedPrefix: 'B', min: 1, max: 9 }),
+        };
+
+        // รวมถ่วงน้ำหนัก: นับเฉพาะมิติที่มี sim จริง (ไม่ใช่ null)
+        let score = 0, wsum = 0;
+        const contribs = {};      // เก็บ w, s, w*s ต่อมิติ (เพื่อ debug/UI)
+        const weightsUsed = {};   // เก็บน้ำหนักเฉพาะมิติที่ใช้งานจริง
+        for (const k of Object.keys(sims)) {
+          const s = sims[k];
+          if (s == null || !Number.isFinite(s)) continue;
+          const w = Number(W[k]) || 0;
+          if (w <= 0) continue;
+          score += w * s;
+          wsum += w;
+          contribs[k] = { w, s, ws: w * s };
+          weightsUsed[k] = w;
+        }
+
+        const norm = wsum ? (score / wsum) : 0;         // 0..1
+        const normClamped = Math.min(1, Math.max(0, norm));
+        const similarityPct = Math.round(normClamped * 10000) / 100; // ไม่มี boost เพื่อความเรียบง่าย/สอดคล้อง CBR.py
+
+
+        // --- แพ็ก debug object (แนบเฉพาะเมื่อเปิด debug) ---
+        const dbg = wantDebug ? {
+          user_input: {
+            interestd_raw: interestd,
+            interestd_tokens: userInterestTokens,
+            groupwork, solowork, exam, instruction, attendance,
+            present, experience, challenge, time, grade,
+            // แสดงการ parse โค้ด:
+            parsed: { grade: uGrade, exam: uExam, instruction: uInstr }
+          },
+          case_values: {
+            subject_ID: r.subject_ID,
+            group_type: r.group_type,
+            interestd_raw: r.interestd,
+            interestd_tokens: caseInterestTokens,
+            groupwork_ID: r.groupwork_ID,
+            solowork_ID: r.solowork_ID,
+            exam_ID: r.exam_ID,
+            instruction_ID: r.instruction_ID,
+            attendance_ID: r.attendance_ID,
+            present_ID: r.present_ID,
+            experience_ID: r.experience_ID,
+            challenge_ID: r.challenge_ID,
+            time_ID: r.time_ID,
+            grade_ID: r.grade_ID,
+            parsed: { grade: cGrade, exam: cExam, instruction: cInstr }
+          },
+          sims,                 // 0..1 หรือ null
+          weights_used: weightsUsed,
+          contributions: Object.fromEntries(
+            Object.entries(contribs).map(([k, v]) => [
+              k,
+              {
+                w: +v.w.toFixed(6),
+                s: +v.s.toFixed(6),
+                ws: +v.ws.toFixed(6),
+                // สัดส่วนต่อคะแนนรวม (คิดเฉพาะมิติที่ active)
+                ws_pct: wsum ? +((v.ws / wsum) * 100).toFixed(3) : 0
+              }
+            ])
+          ),
+          sums: {
+            score: +score.toFixed(6),
+            wsum: +wsum.toFixed(6),
+            norm: +norm.toFixed(6),
+            similarityPct
+          }
+        } : undefined;
+
+        // (ทางเลือก) log ออกคอนโซลเมื่อ DEBUG_CBR=1
+        if (wantDebug) {
+          const active = Object.keys(contribs).map(k => ({
+            k, w: contribs[k].w, s: contribs[k].s, ws: +contribs[k].ws.toFixed(6)
+          }));
+          console.log('—— CBR DEBUG —— subject', r.subject_ID);
+          console.log('W used =', weightsUsed);
+          console.log('active dims =', active);
+          console.log('sumW =', +wsum.toFixed(6), 'score =', +score.toFixed(6), 'norm =', +norm.toFixed(6));
+        }
+
+
+        return {
+          subject_ID: r.subject_ID,
+          subject_Name: r.subject_Name,
+          review: r.review,
+          group_type: r.group_type,
+          group_type_name: r.GroupType_Name || String(r.group_type),
+          similarity: similarityPct,
+          sims,
+          ...(wantDebug ? { dbg } : {})   // <<— ส่งชุดดีบักกลับไป
+        };
+      });
+
+      // เรียงคะแนน
+      results.sort((a, b) => b.similarity - a.similarity);
+
+      // ตอบแบบ “แยกกลุ่ม” (Top 3/กลุ่ม) ถ้าผู้ใช้เลือก group_types
+      const wantGroups = Array.isArray(group_types) && group_types.length > 0;
+      if (wantGroups) {
+        const grouped = {};
+        for (const item of results) {
+          const key = String(item.group_type);
+          (grouped[key] ||= {
+            group_type: key,
+            group_type_name: item.group_type_name || key,
+            items: []
+          }).items.push(item);
+        }
+        const TOP_N = 3;
+        const groups = Object.values(grouped).map(g => {
+          g.items.sort((a, b) => b.similarity - a.similarity);
+          g.items = g.items.slice(0, TOP_N);
+          return g;
+        });
+        return res.json({ ok: true, groups });
+      }
+
+      // ไม่ได้ส่ง group_types → ส่งแบบรวม
+      return res.json({ ok: true, top: results.slice(0, 3), all: results });
+
+    } catch (e) {
+      console.error('CBR compute error:', e);
+      return res.status(500).json({ ok: false, message: 'CBR compute error' });
+    }
+  });
+
+  // ---- utils ----
+  function normalizeWeights(w) {
+    const sum = Object.values(w).reduce((a, b) => a + b, 0) || 1;
+    const out = {};
+    for (const k in w) out[k] = w[k] / sum;
+    return out;
+  }
+});
+
+
+//รวมวิชาทั้งหมด ไว้ในกลุ่ม
+app.get('/grouped-subjects', (req, res) => {
+  const sql = `
+    SELECT
+      g.GroupType_ID,
+      g.GroupType_Name,
+      s.subject_ID,
+      s.subject_Name
+    FROM Group_Type g
+    LEFT JOIN Subject s ON s.Group_Type_ID = g.GroupType_ID
+    ORDER BY g.GroupType_ID, s.subject_Name
+  `
+
+  connection.query(sql, (err, rows) => {
+    if (err) return res.status(500).send("Database Error")
+
+    const grouped = []
+
+    rows.forEach(row => {
+      let group = grouped.find(g => g.group_ID === row.GroupType_ID)
+
+      if (!group) {
+        group = {
+          group_ID: row.GroupType_ID,
+          group_Name: row.GroupType_Name,
+          subjects: []
+        }
+        grouped.push(group)
+      }
+
+      if (row.subject_ID) {
+        group.subjects.push({
+          subject_ID: row.subject_ID,
+          subject_Name: row.subject_Name
+        })
+      }
+    })
+
+    res.json(grouped)
+  })
+})
 
 
 

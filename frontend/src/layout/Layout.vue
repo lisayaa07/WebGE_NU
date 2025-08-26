@@ -1,7 +1,10 @@
 <script setup>
 import { ref } from 'vue'
-import { RouterLink } from 'vue-router';
+import { RouterLink, useRoute } from 'vue-router';
+
+const route = useRoute()
 const sidebarOpen = ref(false)
+
 </script>
 
 <template>
@@ -44,20 +47,32 @@ const sidebarOpen = ref(false)
         <!-- ✅ Sidebar  -->
         <aside
             :class="['fixed top-16 bottom-0 left-0 z-40 bg-[#FDF2D3] w-52 p-4 shadow-sm', sidebarOpen ? 'block' : 'hidden', 'lg:block']">
-            <ul class="menu">
-                <li><RouterLink :to="'/'">
+            <ul class="menu rounded-box">
+                <li :class="{ active: route.path === '/' }">
+                    <RouterLink to="/">
                         <FontAwesomeIcon icon="house-chimney" size="xl" /> แนะนำรายวิชา
-                    </RouterLink></li>
-                <li><a>
+                    </RouterLink>
+                </li>
+
+                <li :class="{ active: route.path.startsWith('/allsubjects') }">
+                    <RouterLink to="/allsubjects">
                         <FontAwesomeIcon icon="clipboard-list" size="xl" /> รายวิชาทั้งหมด
-                    </a></li>
-                <li><a>
+                    </RouterLink>
+                </li>
+
+                <li :class="{ active: route.path.startsWith('/popularsubjects') }">
+                    <RouterLink to="/popularsubjects">
                         <FontAwesomeIcon icon="people-robbery" size="xl" /> วิชายอดนิยม
-                    </a></li>
-                <li><RouterLink :to="'/review'">
+                    </RouterLink>
+                </li>
+
+                <li :class="{ active: route.path.startsWith('/review') }">
+                    <RouterLink to="/review">
                         <FontAwesomeIcon icon="comment-dots" size="xl" /> เขียนรีวิว
-                    </RouterLink></li>
+                    </RouterLink>
+                </li>
             </ul>
+
         </aside>
 
         <!-- ✅ พื้นที่ของview -->
@@ -66,3 +81,15 @@ const sidebarOpen = ref(false)
         </main>
     </div>
 </template>
+
+<style scoped>
+:deep(.menu li.active > a),
+:deep(.menu li > a.active),
+:deep(.menu li > a.router-link-active),
+:deep(.menu li > a.router-link-exact-active),
+:deep(.menu li > a[aria-current="page"]) {
+    background-color: rgba(0, 0, 0, 0.12);
+    font-weight: 600;
+    border-radius: 0.5rem;
+}
+</style>

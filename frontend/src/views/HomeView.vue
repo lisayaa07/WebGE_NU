@@ -1,15 +1,15 @@
 <script setup>
 import { RouterLink } from 'vue-router';
 
-import Layout from '@/layout/Layout.vue'; //navbar sidebar
+import Layout from '@/layout/Layout.vue';
 
 </script>
 
 <template>
   <Layout>
-    <div class="text-center mt-10">
-      <h6>แบบทดสอบนี้จะช่วยแนะนำว่าวิชาไหนเหมาะกับคุณเพียงตอบไม่กี่คำถามง่ายๆ</h6>
-      <RouterLink :to="'/matchcase'" class="btn btn-error">เริ่ม</RouterLink>
+    <div class="text-center m-30">
+      <p class="text-3xl">แบบทดสอบนี้จะช่วยแนะนำว่าวิชาไหนเหมาะกับคุณ<br></br>เพียงตอบไม่กี่คำถามง่ายๆ</p>
+      <RouterLink :to="'/matchcase'" class="btn btn-error mt-7 w-30 text-lg">เริ่ม</RouterLink>
     </div>
   </Layout>
 </template>
