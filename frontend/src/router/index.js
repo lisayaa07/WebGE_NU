@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+
 import HomeView from '../views/HomeView.vue'
 import MatchCaseView from '@/views/MatchCaseView.vue'
 import ReviewView from '@/views/ReviewView.vue'
@@ -16,16 +17,19 @@ const router = createRouter({
       path: '/',
       name: 'home',
       component: HomeView,
+      meta: { requiresAuth: true }
     },
     {
       path: '/matchcase',
       name: 'matchcase',
       component: MatchCaseView,
+      meta: { requiresAuth: true }
     },
     {
       path: '/review',
       name: 'review',
       component: ReviewView,
+      meta: { requiresAuth: true }
     },
     {
       path: '/showresults',
@@ -47,17 +51,20 @@ const router = createRouter({
       name: 'popularsubjects',
       component: PopularSubjectsView,
     },
-    { path: '/login', name: 'login', component: Login },
-    { path: '/signup', name: 'signup', component: SignupView },
-
-
-    { path: '/Login.vue', redirect: '/login' },
-    { path: '/Login', redirect: '/login' },
-
-    // หน้าที่ต้องล็อกอิน
-    { path: '/', name: 'home', component: HomeView, meta: { requiresAuth: true } },
-    { path: '/matchcase', name: 'matchcase', component: MatchCaseView, meta: { requiresAuth: true } },
-    { path: '/review', name: 'review', component: ReviewView, meta: { requiresAuth: true } },
+    { path: '/login', 
+      name: 'login', 
+      component: Login 
+    },
+    { path: '/signup', 
+      name: 'signup', 
+      component: SignupView 
+    },
+    { path: '/Login.vue', 
+      redirect: '/login' 
+    },
+    { path: '/Login', 
+      redirect: '/login' 
+    },
   ],
 })
 
