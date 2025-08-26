@@ -287,48 +287,59 @@ app.post("/submit-form", (req, res) => {
 // ✅ API ล็อกอิน
 const bcrypt = require('bcryptjs');
 
+function isNuEmail(v) {
+  return typeof v === 'string' && v.toLowerCase().endsWith('@nu.ac.th');
+}
+ 
 app.post('/login', (req, res) => {
-  const { id, password } = req.body;
-  if (!id || !password) {
-    return res.status(400).json({ ok: false, message: 'กรอก ID และ Password' });
+  // เปลี่ยนชื่อฟิลด์ให้สื่อชัด: email + password
+  const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ ok: false, message: 'กรอก Email และ Password' });
+  }
+  if (!isNuEmail(email)) {
+    return res.status(400).json({ ok: false, message: 'ต้องใช้อีเมล @nu.ac.th เท่านั้น' });
   }
 
+  // 👉 ใช้ email เป็นตัวล็อกอิน / JOIN ด้วย email
   const sql = `
     SELECT
-      u.user_id,
+      u.email,
       u.password,
-      s.full_name,
+      s.student_Name,
       s.student_level,
-      s.faculty_ID
+      s.faculty_ID,      -- ถ้าตารางคุณไม่มีคอลัมน์นี้ ให้เปลี่ยนเป็น s.faculty
+      s.student_ID
     FROM Users u
-    LEFT JOIN Student s ON s.student_id = u.user_id
-    WHERE u.user_id = ?
+    LEFT JOIN Student s ON s.email = u.email   -- ✅ จับคู่ด้วย email
+    WHERE u.email = ?
     LIMIT 1
   `;
 
-  connection.query(sql, [id], async (err, rows) => {
+  connection.query(sql, [email.toLowerCase()], async (err, rows) => {
     if (err) {
       console.error('DB error:', err);
       return res.status(500).json({ ok: false, message: 'Database Error' });
     }
     if (!rows.length) {
-      return res.status(401).json({ ok: false, message: 'ID หรือ Password ไม่ถูกต้อง' });
+      return res.status(401).json({ ok: false, message: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' });
     }
 
     const row = rows[0];
     const ok = await bcrypt.compare(password, row.password);
     if (!ok) {
-      return res.status(401).json({ ok: false, message: 'ID หรือ Password ไม่ถูกต้อง' });
+      return res.status(401).json({ ok: false, message: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' });
     }
 
-    // ✅ สำเร็จ: ส่งโปรไฟล์กลับตัวเดียวพอ
+    // ✅ สำเร็จ: ส่งโปรไฟล์กลับ
     return res.json({
       ok: true,
       user: {
-        id: row.user_id,
-        name: row.full_name || '',
+        id: row.email,                               // ใช้ email เป็น id ของ session ฝั่ง client
+        student_ID: row.student_ID || '',            // เผื่อหน้าอื่นต้องใช้
+        name: row.student_Name || '',
         student_level: row.student_level || '',
-        faculty_ID: row.faculty_ID || ''
+        faculty_ID: (row.faculty_ID ?? row.faculty ?? ''), // รองรับทั้ง faculty_ID / faculty
       }
     });
   });
@@ -336,32 +347,47 @@ app.post('/login', (req, res) => {
 
 
 
+
 // ===== สมัครบัญชี =====
 app.post('/register', (req, res) => {
-  const { student_id, password, full_name, student_level, faculty } = req.body;
+  // รับค่าจาก body: ใช้ชื่อ student_ID / student_Name เป็นหลัก
+  // (เผื่อฟรอนต์เก่าส่ง student_id/full_name มาจะ fallback ให้)
+  const student_ID = req.body.student_ID ?? req.body.student_id;
+  const student_Name = req.body.student_Name ?? req.body.full_name;
+  const email = (req.body.email || '').trim().toLowerCase();
+  const password = req.body.password;
+  const student_level = req.body.student_level;
+  const faculty = req.body.faculty;
 
-  // ตรวจ input
-  if (!student_id || !password || !full_name || !student_level || !faculty) {
+  // ตรวจความครบถ้วน
+  if (!student_ID || !student_Name || !email || !password || !student_level || !faculty) {
     return res.status(400).json({ ok: false, message: 'กรอกข้อมูลให้ครบ' });
   }
+  // ตรวจโดเมนอีเมล @nu.ac.th
+  function isNuEmail(v) {
+    return typeof v === 'string' && v.endsWith('@nu.ac.th');
+  }
+  if (!isNuEmail(email)) {
+    return res.status(400).json({ ok: false, message: 'ต้องใช้อีเมล @nu.ac.th เท่านั้น' });
+  }
 
-  // เช็คซ้ำว่ามี user/นิสิตนี้แล้วหรือยัง
+  // เช็คซ้ำว่ามีอยู่แล้วหรือไม่
   const checkSql = `
     SELECT
-      (SELECT COUNT(*) FROM Student WHERE student_id = ?) AS sCount,
-      (SELECT COUNT(*) FROM Users   WHERE user_id    = ?) AS uCount
+      (SELECT COUNT(*) FROM Student WHERE student_ID = ?) AS sCount,
+      (SELECT COUNT(*) FROM Users   WHERE email      = ?) AS uCount
   `;
-  connection.query(checkSql, [student_id, student_id], async (err, rows) => {
+  connection.query(checkSql, [student_ID, email], async (err, rows) => {
     if (err) {
       console.error('DB error:', err);
       return res.status(500).json({ ok: false, message: 'Database Error' });
     }
-    const { sCount, uCount } = rows[0];
+    const { sCount = 0, uCount = 0 } = rows?.[0] || {};
     if (sCount > 0 || uCount > 0) {
       return res.status(409).json({ ok: false, message: 'มีบัญชีนี้อยู่แล้ว' });
     }
 
-    // ทำเป็น transaction
+    // เริ่มทรานแซกชัน
     connection.beginTransaction(async (trErr) => {
       if (trErr) {
         console.error('beginTransaction error:', trErr);
@@ -369,40 +395,51 @@ app.post('/register', (req, res) => {
       }
 
       try {
-        // 1) แทรก Student
-        const insertStudent = `
-          INSERT INTO Student (student_id, full_name, student_level, faculty_ID)
-          VALUES (?, ?, ?, ?)
-        `;
-        connection.query(insertStudent, [student_id, full_name, student_level, faculty], async (iSErr) => {
-          if (iSErr) {
-            console.error('Insert Student error:', iSErr);
+        // 1) แทรก Users ก่อน (ถ้า Student.email เป็น FK → Users.email)
+        const hash = await bcrypt.hash(password, 10);
+        const insertUser = `INSERT INTO Users (email, password) VALUES (?, ?)`;
+        connection.query(insertUser, [email, hash], (iUErr) => {
+          if (iUErr) {
+            // ซ้ำอีเมล
+            if (iUErr.code === 'ER_DUP_ENTRY') {
+              return connection.rollback(() => {
+                res.status(409).json({ ok: false, message: 'อีเมลนี้ถูกใช้แล้ว' });
+              });
+            }
+            console.error('Insert Users error:', iUErr);
             return connection.rollback(() => {
-              res.status(500).json({ ok: false, message: 'Insert Student failed' });
+              res.status(500).json({ ok: false, message: 'Insert Users failed' });
             });
           }
 
-          // 2) แทรก Users (เก็บรหัสผ่านแบบ hash)
-          const hash = await bcrypt.hash(password, 10);
-          const insertUser = `INSERT INTO Users (user_id, password) VALUES (?, ?)`;
-          connection.query(insertUser, [student_id, hash], (iUErr) => {
-            if (iUErr) {
-              console.error('Insert Users error:', iUErr);
-              return connection.rollback(() => {
-                res.status(500).json({ ok: false, message: 'Insert Users failed' });
-              });
-            }
-
-            connection.commit((cErr) => {
-              if (cErr) {
-                console.error('Commit error:', cErr);
+          // 2) แทรก Student (ใช้คอลัมน์ตาม DB: student_ID, student_Name, ...)
+          const insertStudent = `
+            INSERT INTO Student (student_ID, student_Name, student_level, faculty_ID, email)
+            VALUES (?, ?, ?, ?, ?)
+          `;
+          connection.query(
+            insertStudent,
+            [student_ID, student_Name, student_level, faculty, email],
+            (iSErr) => {
+              if (iSErr) {
+                // ถ้า FK ล้มเหลวเพราะ Users ยังไม่พร้อม (ไม่น่าเกิดเพราะเรา insert Users ก่อนแล้ว)
+                console.error('Insert Student error:', iSErr);
                 return connection.rollback(() => {
-                  res.status(500).json({ ok: false, message: 'Commit failed' });
+                  res.status(500).json({ ok: false, message: 'Insert Student failed' });
                 });
               }
-              res.json({ ok: true, message: 'สมัครบัญชีสำเร็จ' });
-            });
-          });
+
+              connection.commit((cErr) => {
+                if (cErr) {
+                  console.error('Commit error:', cErr);
+                  return connection.rollback(() => {
+                    res.status(500).json({ ok: false, message: 'Commit failed' });
+                  });
+                }
+                res.json({ ok: true, message: 'สมัครบัญชีสำเร็จ' });
+              });
+            }
+          );
         });
       } catch (e) {
         console.error('Register catch error:', e);
@@ -413,6 +450,8 @@ app.post('/register', (req, res) => {
     });
   });
 });
+
+
 
 
 
@@ -757,6 +796,36 @@ app.get('/grouped-subjects', (req, res) => {
     res.json(grouped)
   })
 })
+
+// ✅ ดึง "รีวิวทั้งหมด" ของวิชานั้น
+app.get('/subjects/:id/reviews', (req, res) => {
+  const subjectId = String(req.params.id || '').trim()
+  if (!subjectId) {
+    return res.status(400).json({ message: 'subject id is required' })
+  }
+
+  const sql = `
+    SELECT
+      fr_ID      AS id,
+      subject_ID AS subjectId,
+      review     AS text
+    FROM Form_review
+    WHERE subject_ID = ?
+    ORDER BY fr_ID DESC
+  `
+  connection.query(sql, [subjectId], (err, rows) => {
+    if (err) {
+      console.error('❌ fetch reviews failed:', err)
+      return res.status(500).json({ message: 'Failed to fetch reviews' })
+    }
+    res.json({
+      subjectId,
+      count: rows.length,
+      reviews: rows, // [{ id, subjectId, text }]
+    })
+  })
+})
+
 
 
 

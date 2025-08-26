@@ -1,14 +1,15 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import pro from '/Photo/pro.png' // ← เปลี่ยนชื่อไฟล์ตามที่คุณมี
+import pro from '/Photo/pro.png'
 
 const router = useRouter()
 
 // ฟอร์ม
-const student_id = ref('')
+const student_ID = ref('')
+const email = ref('')
 const password = ref('')
-const full_name = ref('')
+const student_Name = ref('')
 const student_level = ref('')
 const faculty = ref('')
 
@@ -19,6 +20,11 @@ const faculties = ref([])
 const loading = ref(false)
 const errorMsg = ref('')
 const okMsg = ref('')
+
+// ตรวจอีเมล @nu.ac.th
+function isNuEmail(v) {
+  return typeof v === 'string' && v.toLowerCase().endsWith('@nu.ac.th')
+}
 
 // โหลดรายชื่อคณะ
 onMounted(async () => {
@@ -37,19 +43,32 @@ const onSubmit = async (e) => {
   okMsg.value = ''
   loading.value = true
   try {
+    const emailClean = email.value.trim().toLowerCase()
+
+    if (!isNuEmail(emailClean)) {
+      throw new Error('โปรดใช้อีเมลที่ลงท้ายด้วย @nu.ac.th เท่านั้น')
+    }
+    if (!student_ID.value.trim()) {
+      throw new Error('กรอก Student ID')
+    }
+    if (!password.value) {
+      throw new Error('กรอกรหัสผ่าน')
+    }
+
     const res = await fetch('http://localhost:3000/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        student_id: student_id.value.trim(),
+        // IMPORTANT: ให้ตรงกับ backend ใหม่
+        student_ID: student_ID.value.trim(),
+        email: emailClean,
         password: password.value,
-        full_name: full_name.value.trim(),
+        student_Name: student_Name.value.trim(),
         student_level: student_level.value,
         faculty: faculty.value,
       }),
     })
 
-    // อ่านเป็น text แล้วค่อย parse เผื่อเซิร์ฟเวอร์ตอบ HTML ตอน error
     const ct = res.headers.get('content-type') || ''
     const raw = await res.text()
     const data = ct.includes('application/json') ? JSON.parse(raw) : {}
@@ -68,11 +87,12 @@ const onSubmit = async (e) => {
 }
 </script>
 
+
+
 <template>
   <div class="min-h-screen flex items-center justify-center bg-[#F6E8C8]">
-    <!-- กล่องใหญ่ แบ่งซ้าย/ขวา -->
     <div class="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 bg-[#FBE7B2] rounded-[28px] shadow-xl overflow-hidden">
-      <!-- ซ้าย: ภาพ + Welcome -->
+      <!-- ซ้าย -->
       <div class="relative p-6 lg:p-10 bg-[#F7C86A]">
         <div class="absolute inset-0 bg-gradient-to-br from-[#FAD98C] via-[#F7C86A] to-[#F2B45E]" aria-hidden="true" />
         <div class="relative h-full flex flex-col items-center justify-center text-center">
@@ -87,40 +107,35 @@ const onSubmit = async (e) => {
           <h2 class="text-3xl font-extrabold text-[#2E2A1F] mb-6">Sign up</h2>
 
           <div class="grid grid-cols-1 gap-4">
+            <!-- 1) Email -->
             <label class="block">
-              <span class="text-sm text-[#6B614B]">student id</span>
-              <input
-                v-model="student_id"
-                class="input input-bordered w-full bg-white mt-2"
-                placeholder="student id"
-                maxlength="12"
-                autocomplete="username"
-                required
-              />
+              <span class="text-sm text-[#6B614B]">Email</span>
+              <input v-model="email" type="email" inputmode="email" class="input input-bordered w-full bg-white mt-2"
+                placeholder="Enter your email" autocomplete="email" required pattern="^[^@\s]+@nu\.ac\.th$" />
             </label>
 
+            <!-- 2) Password -->
             <label class="block">
-              <span class="text-sm text-[#6B614B]">password</span>
-              <input
-                v-model="password"
-                type="password"
-                class="input input-bordered w-full bg-white mt-2"
-                placeholder="password"
-                autocomplete="new-password"
-                required
-              />
+              <span class="text-sm text-[#6B614B]">Password</span>
+              <input v-model="password" type="password" class="input input-bordered w-full bg-white mt-2"
+                placeholder="password" autocomplete="new-password" required />
             </label>
 
+            <!-- 3) Student ID -->
+            <label class="block">
+              <span class="text-sm text-[#6B614B]">Student ID</span>
+              <input v-model="student_ID" class="input input-bordered w-full bg-white mt-2" placeholder="student id"
+                maxlength="12" autocomplete="username" required />
+            </label>
+
+            <!-- 4) ชื่อ-สกุล -->
             <label class="block">
               <span class="text-sm text-[#6B614B]">ชื่อ-สกุล</span>
-              <input
-                v-model="full_name"
-                class="input input-bordered w-full bg-white mt-2"
-                placeholder="ชื่อ-สกุล"
-                required
-              />
+              <input v-model="student_Name" class="input input-bordered w-full bg-white mt-2" placeholder="ชื่อ-สกุล"
+                required />
             </label>
 
+            <!-- 5) ชั้นปี -->
             <label class="block">
               <span class="text-sm text-[#6B614B]">ชั้นปี</span>
               <select v-model="student_level" class="select select-bordered w-full bg-white mt-2" required>
@@ -132,6 +147,7 @@ const onSubmit = async (e) => {
               </select>
             </label>
 
+            <!-- 6) คณะ -->
             <label class="block">
               <span class="text-sm text-[#6B614B]">คณะ</span>
               <select v-model="faculty" class="select select-bordered w-full bg-white mt-2" required>

@@ -1,14 +1,6 @@
 <script setup>
 import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { useResultsStore } from '@/stores/results'
-
 import Layout from '@/layout/Layout.vue'
-import api from '@/api/api'
-
-
-const router = useRouter()
-const resultsStore = useResultsStore()
 
 const userCase = ref(null)
 
@@ -29,12 +21,39 @@ const time = ref(null)
 const subjectGroups = ref([])
 const selectedGroupTypes = ref([])
 
+
 const resultGroups = ref([])
+
+async function fetchJSON(url, options) {
+    const res = await fetch(url, options)
+    const text = await res.text()
+    if (!res.ok) {
+        // โยนข้อความดิบกลับไปให้ดูง่าย
+        throw new Error(`HTTP ${res.status} @ ${url}\n${text.slice(0, 300)}`)
+    }
+    try {
+        return JSON.parse(text)
+    } catch (e) {
+        throw new Error(`Invalid JSON @ ${url}\nFirst bytes: ${text.slice(0, 100)}`)
+    }
+}
+
+
+onMounted(async () => {
+    try {
+        const sgRes = await fetch('http://localhost:3000/subject-groups')
+        subjectGroups.value = await sgRes.json()
+
+    } catch (err) {
+        console.error("โหลดข้อมูลไม่สำเร็จ:", err)
+    }
+})
 
 /* ---------- state: ผลลัพธ์/โหลด/เออเรอร์ ---------- */
 const loading = ref(false)
 const errorMsg = ref('')
 const results = ref([])
+
 
 /* ---------- helpers ---------- */
 // เกรดตัวอักษร -> ตัวเลขระดับ (ให้ตรงกับฝั่ง server)
@@ -52,6 +71,7 @@ function pickSimilarity(obj) {
     return null
 }
 
+// แปลงเป็นข้อความเปอร์เซ็นต์เสมอ (รับ 0..1, 0..100, "85", "85%")
 // ฟังก์ชันช่วยแปลงเลขเป็น %
 function pct(v) {
     if (v == null) return '-'
@@ -61,7 +81,9 @@ function pct(v) {
     return p.toFixed(2) + '%'
 }
 
+
 function letterGradeToCScale(g) {
+
     const map = { 'A': 'B1', 'B+': 'B2', 'B': 'B3', 'C+': 'B4', 'C': 'B5', 'D+': 'B6', 'D': 'B7' }
     return map[g] ?? 'B0' // ถ้าไม่ระบุให้ถอยไป C0
 }
@@ -71,53 +93,6 @@ function toZeroBased(v) {
     const n = Number(v)
     if (!Number.isFinite(n)) return null
     return n - 1   // แปลง 1→0, 2→1, ...
-}
-
-//โหลดข้อมูลตอน mount
-onMounted(async () => {
-    try {
-        const { data } = await api.get('/subject-groups')
-        subjectGroups.value = Array.isArray(data) ? data : []
-    } catch (err) {
-        console.error("โหลดข้อมูลไม่สำเร็จ:", err?.response?.status, err?.response?.data || err.message)
-    }
-})
-
-// เปิด/ปิดการล็อกดีบักในคอนโซล (ตั้ง false เมื่อปล่อยโปรดักชัน)
-const DEBUG_LOG = import.meta.env.DEV || import.meta.env.VITE_DEBUG_LOG === 'true'
-
-function logDebugItem(c) {
-    if (!DEBUG_LOG || !c?.dbg) return
-
-    const name = c.subject_Name || `วิชา #${c.subject_ID}`
-    const simPct = Number(c.similarity ?? 0).toFixed(2)
-
-    // กลุ่มแบบย่อ อ่านง่าย
-    console.groupCollapsed(`DBG: ${name} (similarity ${simPct}%)`)
-
-    // 1) ค่าที่ผู้ใช้กรอก / ค่าของเคส
-    console.log('ผู้ใช้กรอก:', c.dbg.user_input)
-    console.log('ค่าของเคส (DB):', c.dbg.case_values)
-
-    // 2) ตารางคอนทริบิวชัน (ใช้ console.table ให้อ่านง่าย)
-    const contribs = c.dbg.contributions || {}
-    const rows = Object.keys(contribs).map((k) => ({
-        dim: k,
-        sim: Number(c.sims?.[k] ?? 0).toFixed(3),
-        weight: contribs[k]?.w,
-        ws: contribs[k]?.ws,
-        pct: `${contribs[k]?.ws_pct}%`,
-    }))
-    if (rows.length) {
-        console.table(rows)
-    } else {
-        console.log('ไม่มี contributions')
-    }
-
-    // 3) สรุปรวม
-    console.log('สรุป:', c.dbg.sums)
-
-    console.groupEnd()
 }
 
 
@@ -145,13 +120,22 @@ async function onSubmit() {
             // weights: { ... }  // (ถ้ามี)
         }
 
-        const { data } = await api.post('/cbr-match', payload)
+        // (ไม่จำเป็นต้องดึง /interestd ตรงนี้)
+        // CBR
+        const r2 = await fetch('http://localhost:3000/cbr-match', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        if (!r2.ok) throw new Error(`HTTP ${r2.status}`);
+        const data = await r2.json();
 
         // ✅ รับ groups จาก backend
         resultGroups.value = Array.isArray(data.groups) ? data.groups : []
 
         // ใช้ top ถ้ามี ไม่งั้นใช้ all
         const raw = (Array.isArray(data.top) && data.top.length ? data.top : data.all) || []
+
 
         // ✅ บังคับให้มี field similarity เสมอ (รองรับหลายชื่อ)
         results.value = raw.map(r => {
@@ -160,30 +144,12 @@ async function onSubmit() {
             return { ...r, similarity: Number.isFinite(n) ? n : 0 }
         })
 
+
         // debug
         console.log('CBR response:', data)
         console.log('Mapped results:', results.value)
-
-        // ✅ ส่งผลลัพธ์ไปเก็บใน Pinia store และไปหน้า /results 
-        resultsStore.setResults({
-            resultGroups: resultGroups.value,
-            results: results.value,
-            payload, // เก็บไว้เผื่อ debug/ย้อนกลับ 
-        })
-
-        if (DEBUG_LOG) {
-            for (const g of resultGroups.value || []) {
-                for (const c of g.items || []) {
-                    logDebugItem(c)
-                }
-            }
-        }
-
-        router.push({ name: 'showresults' }) // ไปหน้าแสดงผล
-
-
     } catch (e) {
-        errorMsg.value = e?.response?.data?.message || e.message || 'เกิดข้อผิดพลาด'
+        errorMsg.value = e.message || 'เกิดข้อผิดพลาด'
     } finally {
         loading.value = false
     }
@@ -464,7 +430,7 @@ async function onSubmit() {
             </div>
 
             <!-- แสดงผลลัพธ์ -->
-            <!-- <div class="mt-6">
+            <div class="mt-6">
                 <div v-if="loading" class="p-4">กำลังคำนวณเคส…</div>
                 <div v-else-if="errorMsg" class="p-4 text-error">{{ errorMsg }}</div>
                 <div v-else>
@@ -536,7 +502,8 @@ async function onSubmit() {
                         </div>
                     </div>
                 </div>
-            </div> -->
+            </div>
+
         </form>
     </Layout>
 </template>

@@ -42,7 +42,7 @@ const router = createRouter({
       component: AllSubjectsView,
     },
     {
-      path: '/reviewsubjects',
+      path: '/reviewsubjects/:id/reviews',
       name: 'reviewsubjects',
       component: ReviewSubjectsView,
     },
@@ -68,10 +68,9 @@ const router = createRouter({
   ],
 })
 
-
 // guard ง่าย ๆ
 router.beforeEach((to, from, next) => {
-  const loggedIn = localStorage.getItem('auth') === '1'
+  const loggedIn = !!(localStorage.getItem('userEmail') || '').trim()
   if (to.meta.requiresAuth && !loggedIn) return next({ name: 'login' })
   next()
 })
