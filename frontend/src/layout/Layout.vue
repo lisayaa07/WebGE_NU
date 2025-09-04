@@ -1,9 +1,78 @@
 <script setup>
-import { ref } from 'vue'
-import { RouterLink, useRoute } from 'vue-router';
+import { ref , onMounted, computed } from 'vue'
+import { RouterLink, useRoute, useRouter } from 'vue-router';
+import profile from '/Photo/profile.png'
 
+const router = useRouter()
 const route = useRoute()
 const sidebarOpen = ref(false)
+
+
+// ดึงข้อมูลผู้ใช้จาก localStorage
+const user = ref({
+  email: '',
+  student_ID: '',
+  student_level: '',
+  faculty_ID: '',
+  name: ''
+})
+
+const faculties = ref([])
+
+onMounted(async() => {
+  user.value.email         = localStorage.getItem('userEmail')    || ''
+  user.value.student_ID    = localStorage.getItem('student_ID')   || ''
+  user.value.student_level = localStorage.getItem('studentLevel') || ''
+  user.value.faculty_ID    = (localStorage.getItem('facultyId') || localStorage.getItem('faculty_ID') || '').toString()
+  user.value.name          = localStorage.getItem('studentName')  || ''
+
+  console.log('[Layout] LS:', {
+  email: localStorage.getItem('userEmail'),
+  student_ID: localStorage.getItem('student_ID'),
+  studentLevel: localStorage.getItem('studentLevel'),
+  facultyId: localStorage.getItem('facultyId'),
+  studentName: localStorage.getItem('studentName'),
+})
+
+  // โหลดรายชื่อคณะ (ID → Name)
+  try {
+    const res = await fetch('http://localhost:3000/faculty')
+    faculties.value = await res.json()
+  } catch (e) {
+    console.error('โหลดคณะไม่สำเร็จ:', e)
+    faculties.value = []
+  }
+})
+
+    const currentFacultyId = computed(() =>
+    (user.value.faculty_ID || '').toString().trim()
+    )
+
+    const facultyName = computed(() => {
+    const fid = currentFacultyId.value
+        if (!fid) return '—'
+        // เทียบแบบแปลงเป็น string เสมอ กันกรณี number/string ไม่ตรงกัน
+        const found = faculties.value.find(f => String(f.faculty_ID).trim() === fid)
+        return found?.faculty_Name || fid || '—'
+        })
+
+
+
+function openProfile() {
+  const dlg = document.getElementById('profileModal')
+  if (dlg && typeof dlg.showModal === 'function') dlg.showModal()
+}
+
+function logout() {
+
+  localStorage.removeItem('auth')
+  localStorage.removeItem('userEmail')
+  localStorage.removeItem('student_ID')
+  localStorage.removeItem('studentLevel')
+  localStorage.removeItem('facultyName')
+  localStorage.removeItem('studentName')
+  router.push({ name: 'login' })
+}
 
 </script>
 
@@ -27,20 +96,56 @@ const sidebarOpen = ref(false)
                 </div>
                 <div class="avatar">
                     <div class="w-12 rounded-full">
-                        <img
-                            src="https://scontent.fcnx1-1.fna.fbcdn.net/v/t39.30808-1/515922313_1851394292258966_1297962357253773703_n.jpg?stp=dst-jpg_s200x200_tt6&_nc_cat=109&ccb=1-7&_nc_sid=e99d92&_nc_eui2=AeEidjXgXnKD3Bta0OtpXLFA53EGbMn858zncQZsyfznzEBQ-L_gav3Xb9m7ttm3f7vGVz5Xc627yri9ZpvFqeW6&_nc_ohc=UR6kppwHPm4Q7kNvwHnR1Gi&_nc_oc=AdmkUyFNM5pJy471E5DbLenp9zVzRuLaw1fUHNWTF9bTz7X_zbUiRHWT1MTiV2uTbTE&_nc_zt=24&_nc_ht=scontent.fcnx1-1.fna&_nc_gid=k2nSgfCCxp7P2gRKH6KqUQ&oh=00_AfVQ4uEi9Os1RMdFNZ6ur-nV7mZIXd0MeC0mccUgeWbpyw&oe=68A689AD" />
+                        <img :src="profile" alt="profile" />
                     </div>
                 </div>
-                <span>Chanipron Oonping</span>
+                <span>{{ user.name || '—' }}</span>
                 <div class="dropdown dropdown-end">
                     <div tabindex="0" role="button" class="btn btn-ghost btn-circle">
                         <FontAwesomeIcon icon="chevron-down" size="xl" />
                     </div>
                     <ul tabindex="0" class="menu menu-sm dropdown-content bg-base-100 rounded-box mt-3 w-52 p-2 shadow">
-                        <li><a>Profile</a></li>
-                        <li><a>Logout</a></li>
+                        <li><button @click="openProfile">Profile</button></li>
+                        <li><button @click="logout">Logout</button></li>
                     </ul>
                 </div>
+
+                <!-- Popup โปรไฟล์ -->
+                <dialog id="profileModal" class="modal">
+                    <div class="modal-box bg-[#FFE0B2] shadow-xl rounded-2xl">
+                    <h3 class="font-bold text-2xl mb-5 text-[#8B4513]">โปรไฟล์</h3>
+
+                    <div class="flex items-center gap-4 mb-6">
+                        <div class="avatar">
+                        <div class="w-24 rounded-full ring ring-primary ring-offset-base-100 ring-offset-2">
+                            <img :src="profile" alt="profile" />
+                        </div>
+                        </div>
+                        <div>
+                        <div class="mt-3 text-xl font-semibold text-[#5D4037]">{{ user.name || '—' }}</div>
+                        <div class="text-sm opacity-70">{{ user.email || '—' }}</div>
+                        <div class="text-sm opacity-70">Student ID: {{ user.student_ID || '—' }}</div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4 text-lg"> <!-- ✅ font ใหญ่ขึ้น -->
+                        <div class="p-4 rounded-box bg-base-200">
+                        <div class="opacity-60 text-base">ชั้นปี</div>
+                        <div class="font-medium text-xl">{{ user.student_level || '—' }}</div>
+                        </div>
+                        <div class="p-4 rounded-box bg-base-200">
+                        <div class="opacity-60 text-base">คณะ</div>
+                        <div class="font-medium text-xl">{{ facultyName }}</div>
+                        </div>
+                    </div>
+
+                    <div class="modal-action mt-6">
+                        <form method="dialog">
+                        <button class="btn bg-[#FFB74D] hover:bg-[#F57C00] text-white text-lg px-6">ปิด</button>
+                        </form>
+                    </div>
+                    </div>
+                </dialog>
             </div>
         </nav>
 
