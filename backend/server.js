@@ -308,10 +308,12 @@ app.post('/login', (req, res) => {
       u.password,
       s.student_Name,
       s.student_level,
-      s.faculty_ID,      -- ถ้าตารางคุณไม่มีคอลัมน์นี้ ให้เปลี่ยนเป็น s.faculty
+      s.faculty_ID,  
+      f.faculty_Name,    
       s.student_ID
     FROM Users u
     LEFT JOIN Student s ON s.email = u.email   -- ✅ จับคู่ด้วย email
+    LEFT JOIN Faculty f ON f.faculty_ID = s.faculty_ID
     WHERE u.email = ?
     LIMIT 1
   `;
@@ -339,7 +341,8 @@ app.post('/login', (req, res) => {
         student_ID: row.student_ID || '',            // เผื่อหน้าอื่นต้องใช้
         name: row.student_Name || '',
         student_level: row.student_level || '',
-        faculty_ID: (row.faculty_ID ?? row.faculty ?? ''), // รองรับทั้ง faculty_ID / faculty
+        faculty_ID: row.faculty_ID || '',
+        faculty_Name: row.faculty_Name || ''
       }
     });
   });
@@ -450,6 +453,7 @@ app.post('/register', (req, res) => {
     });
   });
 });
+
 
 
 

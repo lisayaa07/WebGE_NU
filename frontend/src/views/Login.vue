@@ -27,13 +27,15 @@ const onLogin = async (e) => {
       throw new Error(data.message || 'เข้าสู่ระบบไม่สำเร็จ')
     }
 
-    // ⬇️ เก็บ user profile ลง localStorage
+      // ⬇️ เก็บ user profile ลง localStorage
     // หลัง login สำเร็จ
     localStorage.setItem('auth', '1')
     localStorage.setItem('userEmail', data.user.id)
     localStorage.setItem('student_ID', data.user.student_ID || '')
     localStorage.setItem('studentLevel', data.user.student_level || '')
     localStorage.setItem('facultyId', data.user.faculty_ID || '')
+    localStorage.setItem('facultyName', data.user.faculty_Name || '')
+    localStorage.setItem('studentName',  data.user.name || '') 
 
 
 
