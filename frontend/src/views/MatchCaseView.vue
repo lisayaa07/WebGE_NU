@@ -12,10 +12,11 @@ const resultsStore = useResultsStore()
 
 const userCase = ref(null)
 
+
 /* ---------- state: คำตอบผู้ใช้ ---------- */
 const selectedInterestd = ref([])   // [1,2,3,...]
-const selectedGrade = ref('')       // 'A','B+', ...
-const interestd = ref([])
+
+
 
 const groupwork = ref(null)
 const solowork = ref(null)
@@ -36,12 +37,8 @@ const loading = ref(false)
 const errorMsg = ref('')
 const results = ref([])
 
+
 /* ---------- helpers ---------- */
-// เกรดตัวอักษร -> ตัวเลขระดับ (ให้ตรงกับฝั่ง server)
-function gradeToLevel(g) {
-    const map = { A: 4, 'B+': 3.5, B: 3, 'C+': 2.5, C: 2, 'D+': 1.5, D: 1 }
-    return map[g] ?? null
-}
 
 // robust: เลือกคีย์คะแนนที่มีอยู่จริง (กันชื่อไม่ตรง)
 function pickSimilarity(obj) {
@@ -61,10 +58,7 @@ function pct(v) {
     return p.toFixed(2) + '%'
 }
 
-function letterGradeToCScale(g) {
-    const map = { 'A': 'B1', 'B+': 'B2', 'B': 'B3', 'C+': 'B4', 'C': 'B5', 'D+': 'B6', 'D': 'B7' }
-    return map[g] ?? 'B0' // ถ้าไม่ระบุให้ถอยไป C0
-}
+
 
 function toZeroBased(v) {
     if (v == null || v === '') return null
@@ -139,7 +133,6 @@ async function onSubmit() {
             experience: toZeroBased(experience.value),
             challenge: toZeroBased(challenge.value),
             time: toZeroBased(time.value),
-            grade: selectedGrade.value,  // จะได้ "B1" .. "B9"
             group_types: selectedGroupTypes.value,  // ✅ ส่งหลายกลุ่ม
             debug: true,
             // weights: { ... }  // (ถ้ามี)
@@ -192,6 +185,7 @@ async function onSubmit() {
 
 <template>
     <Layout>
+        
         <form class="p-6 space-y-6" @submit.prevent="onSubmit">
             <!-- ความสนใจ -->
             <div class="bg-[#F992AF]/50 p-6 rounded-3xl grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -251,20 +245,7 @@ async function onSubmit() {
                         {{ g.GroupType_Name }}
                     </label>
 
-                    <label class="block mt-4">
-                        <span class="font-semibold">เกรดที่คาดหวัง</span>
-                        <select v-model="selectedGrade" class="select select-error w-full mt-3">
-                            <option disabled value="">กรุณาระบุ</option>
-                            <option value="B1">A</option>
-                            <option value="B2">B+</option>
-                            <option value="B3">B</option>
-                            <option value="B4">C+</option>
-                            <option value="B5">C</option>
-                            <option value="B6">D+</option>
-                            <option value="B7">D</option>
-                            <option value="B8">F</option>
-                        </select>
-                    </label>
+
 
                 </div>
             </div>
@@ -460,7 +441,7 @@ async function onSubmit() {
 
             <!-- ปุ่ม submit -->
             <div class="text-center">
-                <button type="submit" class="btn bg-black text-white border-black w-30 h-15 text-xl">คำนวณ</button>
+                <button type="submit" class="btn btn-primary">คำนวณ</button>
             </div>
 
             <!-- แสดงผลลัพธ์ -->
