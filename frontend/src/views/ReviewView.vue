@@ -248,7 +248,6 @@ function resetForm() {
                     </label>
                 </div>
                 <div>
-                    <h2 class="font-bold mb-2">หมวดวิชาศึกษาทั่วไปที่นิสิตจะลงเรียน</h2>
 
                     <fieldset class="fieldset">
                         <legend class="fieldset-legend text-lg">หมวดวิชา (กลุ่มวิชา)</legend>
@@ -274,7 +273,7 @@ function resetForm() {
 
 
                     <label class="block mt-4">
-                        <span class="font-semibold">เกรดที่คาดหวัง</span>
+                        <span class="font-semibold">เกรดที่ได้</span>
                         <select v-model="selectedGrade" class="select select-error w-full mt-3">
                             <option disabled value="">กรุณาระบุ</option>
                             <option v-for="grades in grades" :key="grades.grade_ID" :value="grades.grade_ID">

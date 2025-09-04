@@ -16,10 +16,11 @@ function backToForm() {
 function Comments(c) {
     router.push({
         name: 'reviewsubjects',
-        params: { id: c.subject_ID },     // ✅ ส่ง subject_ID ไปเป็นพารามิเตอร์
-        query: { name: c.subject_Name || '', limit: 5 }, // ส่งชื่อไว้โชว์หัวเรื่อง + limit 5
+        params: { id: c.subject_ID },
+        query: { name: c.subject_Name || '' },
     })
 }
+
 </script>
 
 <template>
@@ -48,9 +49,9 @@ function Comments(c) {
                                 <div class="badge badge-warning badge-lg">
                                     {{ Number(c.similarity).toFixed(2) }}%
                                 </div>
-                                <button type="button"
+                                <button type="button" @click="Comments(c)"
                                     class="inline-flex p-2 rounded-full hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                                    aria-label="ดูคอมเมนต์" title="ดูคอมเมนต์" @click="Comments(c)">
+                                    aria-label="ดูคอมเมนต์" title="ดูคอมเมนต์">
                                     <FontAwesomeIcon icon="comment-dots" size="xl" class="text-gray-600" />
                                 </button>
                                 <!-- <RouterLink :to="'/reviewsubjects'">
@@ -66,7 +67,7 @@ function Comments(c) {
                 </div>
             </div>
             <div class="text-center">
-                <RouterLink :to="'/matchcase'" class="btn btn-error">ย้อนกลับ</RouterLink>
+                <RouterLink :to="'/matchcase'" class="btn btn-dash">ย้อนกลับ</RouterLink>
             </div>
         </div>
     </Layout>

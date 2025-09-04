@@ -460,7 +460,7 @@ async function onSubmit() {
 
             <!-- ปุ่ม submit -->
             <div class="text-center">
-                <button type="submit" class="btn btn-primary">คำนวณ</button>
+                <button type="submit" class="btn bg-black text-white border-black w-30 h-15 text-xl">คำนวณ</button>
             </div>
 
             <!-- แสดงผลลัพธ์ -->
