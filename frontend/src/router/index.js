@@ -42,7 +42,7 @@ const router = createRouter({
       component: AllSubjectsView,
     },
     {
-      path: '/reviewsubjects/:id/reviews',
+      path: '/subjects/:id/reviews',
       name: 'reviewsubjects',
       component: ReviewSubjectsView,
     },
