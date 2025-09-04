@@ -290,7 +290,7 @@ const bcrypt = require('bcryptjs');
 function isNuEmail(v) {
   return typeof v === 'string' && v.toLowerCase().endsWith('@nu.ac.th');
 }
- 
+
 app.post('/login', (req, res) => {
   // เปลี่ยนชื่อฟิลด์ให้สื่อชัด: email + password
   const { email, password } = req.body;
@@ -460,8 +460,9 @@ app.post('/cbr-match', (req, res) => {
   const {
     interestd = [],                         // เช่น [1,3,6] (จากฟอร์ม)
     groupwork, solowork, exam, attendance, instruction,
-    present, experience, challenge, time, grade,
-    group_types = [],                       // กรองหมวดวิชา (อาจเป็นรหัสหรือเลขให้ตรง fr.group_type)
+    present, experience, challenge, time,
+    group_types = [],
+    grade: userGrade,                    // กรองหมวดวิชา (อาจเป็นรหัสหรือเลขให้ตรง fr.group_type)
     weights = {}
   } = req.body;
 
@@ -477,12 +478,13 @@ app.post('/cbr-match', (req, res) => {
       gt.GroupType_Name,
       fr.groupwork_ID, fr.solowork_ID, fr.exam_ID, fr.attendance_ID,
       fr.instruction_ID, fr.present_ID, fr.experience_ID, fr.challenge_ID,
-      fr.time_ID, fr.grade_ID, fr.review,
+      fr.time_ID, fr.grade_ID, gm.grade_Name AS grade_Name, fr.review,
       fg.interestd
     FROM Form_review AS fr
     JOIN Form_ge  AS fg ON fg.id = fr.fg_ID
     LEFT JOIN Subject    AS s  ON s.subject_ID = fr.subject_ID
     LEFT JOIN Group_Type AS gt ON gt.GroupType_ID = fr.group_type
+    LEFT JOIN Grade_map  AS gm ON gm.grade_ID  = fr.grade_ID  
   `;
   const params = [];
 
@@ -500,10 +502,9 @@ app.post('/cbr-match', (req, res) => {
 
     try {
       // ---------- น้ำหนัก ----------
-      const W_default = {
+      const baseW = {
         interestd: 20,
         exam: 15,
-        grade: 12,
         instruction: 12,
         groupwork: 10,
         solowork: 10,
@@ -514,10 +515,11 @@ app.post('/cbr-match', (req, res) => {
         present: 1,
       };
       // ถ้าหน้าเว็บส่ง weights มา จะ merge ทับค่า default
-      const W = { ...W_default, ...(weights || {}) };
+      const W = { ...baseW, ...(weights || {}) };
+      const merged = { ...baseW, ...weights };
 
 
-      // ---------- helpers ----------
+
       // แปลง interest เป็น token ตัวเลขเสมอ: ['A1','F3',6] -> ['1','3','6']
       function normalizeInterestTokens(value) {
         if (value == null) return [];
@@ -586,8 +588,40 @@ app.post('/cbr-match', (req, res) => {
         return s;
       }
 
+      const GRADE_SCORE = { 'A': 7, 'B+': 6, 'B': 5, 'C+': 4, 'C': 3, 'D+': 2, 'D': 1, 'F': 0 };
 
+      function gradeScoreFromItem(it) {
+        const raw = String(it.grade_Name ?? it.grade_ID ?? '').toUpperCase().trim();
+        // พยายามดึง token เกรดจากชื่อหรือรหัส เช่น "B1" -> "B", "C+" -> "C+"
+        const m = raw.match(/A|B\+|B|C\+|C|D\+|D|F/);
+        const key = m ? m[0] : null;
+        return key in GRADE_SCORE ? GRADE_SCORE[key] : -1; // -1 = ไม่รู้เกรด
+      }
 
+      function bySimThenGrade(a, b) {
+        const sa = Number(a.similarity) || 0;
+        const sb = Number(b.similarity) || 0;
+        if (sb !== sa) return sb - sa;              // 1) เปอร์เซ็นต์มาก่อน
+        const ga = gradeScoreFromItem(a);
+        const gb = gradeScoreFromItem(b);
+        if (gb !== ga) return gb - ga;              // 2) เกรดสูงกว่า ชนะ
+        // 3) กันกระพือด้วยการเรียงตาม id
+        return String(a.subject_ID).localeCompare(String(b.subject_ID));
+      }
+
+      function dedupeBySubjectKeepBest(arr) {
+        // เรียงให้เคสดีสุดมาก่อน แล้วเก็บตัวแรกของแต่ละ subject_ID
+        const sorted = arr.slice().sort(bySimThenGrade);
+        const seen = new Set();
+        const out = [];
+        for (const it of sorted) {
+          const key = String(it.subject_ID);
+          if (seen.has(key)) continue;
+          seen.add(key);
+          out.push(it);
+        }
+        return out;
+      }
 
 
       // ---------- คำนวณแต่ละเคส ----------
@@ -598,8 +632,8 @@ app.post('/cbr-match', (req, res) => {
 
 
         // ถ้าคุณใช้รหัส B/C/D ให้เห็น level ที่แยกได้
-        const uGrade = parseCodeLevel(grade);
-        const cGrade = parseCodeLevel(r.grade_ID);
+
+
         const uExam = parseCodeLevel(exam);
         const cExam = parseCodeLevel(r.exam_ID);
         const uInstr = parseCodeLevel(instruction);
@@ -616,7 +650,6 @@ app.post('/cbr-match', (req, res) => {
           experience: simInverseAbs(experience, r.experience_ID),
           challenge: simInverseAbs(challenge, r.challenge_ID),
           time: simInverseAbs(time, r.time_ID), // 1..2 ก็ได้ 1/(1+|a-b|)
-          grade: simCodeOrdinal(grade, r.grade_ID, { expectedPrefix: 'B', min: 1, max: 9 }),
         };
 
         // รวมถ่วงน้ำหนัก: นับเฉพาะมิติที่มี sim จริง (ไม่ใช่ null)
@@ -645,9 +678,9 @@ app.post('/cbr-match', (req, res) => {
             interestd_raw: interestd,
             interestd_tokens: userInterestTokens,
             groupwork, solowork, exam, instruction, attendance,
-            present, experience, challenge, time, grade,
+            present, experience, challenge, time,
             // แสดงการ parse โค้ด:
-            parsed: { grade: uGrade, exam: uExam, instruction: uInstr }
+            parsed: { exam: uExam, instruction: uInstr }
           },
           case_values: {
             subject_ID: r.subject_ID,
@@ -663,8 +696,7 @@ app.post('/cbr-match', (req, res) => {
             experience_ID: r.experience_ID,
             challenge_ID: r.challenge_ID,
             time_ID: r.time_ID,
-            grade_ID: r.grade_ID,
-            parsed: { grade: cGrade, exam: cExam, instruction: cInstr }
+            parsed: { exam: cExam, instruction: cInstr }
           },
           sims,                 // 0..1 หรือ null
           weights_used: weightsUsed,
@@ -708,6 +740,8 @@ app.post('/cbr-match', (req, res) => {
           group_type_name: r.GroupType_Name || String(r.group_type),
           similarity: similarityPct,
           sims,
+          grade_ID: r.grade_ID ?? null,
+          grade_Name: r.grade_Name ?? null,
           ...(wantDebug ? { dbg } : {})   // <<— ส่งชุดดีบักกลับไป
         };
       });
@@ -718,24 +752,20 @@ app.post('/cbr-match', (req, res) => {
       // ตอบแบบ “แยกกลุ่ม” (Top 3/กลุ่ม) ถ้าผู้ใช้เลือก group_types
       const wantGroups = Array.isArray(group_types) && group_types.length > 0;
       if (wantGroups) {
-        const grouped = {};
+        const groupsMap = {};
         for (const item of results) {
           const key = String(item.group_type);
-          (grouped[key] ||= {
-            group_type: key,
-            group_type_name: item.group_type_name || key,
-            items: []
-          }).items.push(item);
+          (groupsMap[key] ||= { group_type: key, group_type_name: item.group_type_name || key, items: [] }).items.push(item);
         }
-        const TOP_N = 3;
-        const groups = Object.values(grouped).map(g => {
-          g.items.sort((a, b) => b.similarity - a.similarity);
-          g.items = g.items.slice(0, TOP_N);
+
+        const groups = Object.values(groupsMap).map(g => {
+          const unique = dedupeBySubjectKeepBest(g.items);
+          g.items = unique.slice(0, 3);
           return g;
         });
+
         return res.json({ ok: true, groups });
       }
-
       // ไม่ได้ส่ง group_types → ส่งแบบรวม
       return res.json({ ok: true, top: results.slice(0, 3), all: results });
 
@@ -753,6 +783,7 @@ app.post('/cbr-match', (req, res) => {
     return out;
   }
 });
+
 
 
 //รวมวิชาทั้งหมด ไว้ในกลุ่ม
