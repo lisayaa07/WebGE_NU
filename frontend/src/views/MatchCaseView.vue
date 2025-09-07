@@ -14,20 +14,43 @@ const userCase = ref(null)
 
 
 /* ---------- state: คำตอบผู้ใช้ ---------- */
-const selectedInterestd = ref([])   // [1,2,3,...]
 
 
-
-const groupwork = ref(null)
-const solowork = ref(null)
-const exam = ref(null)
-const attendance = ref(null)
-const instruction = ref(null)
-const present = ref(null)
-const experience = ref(null)
-const challenge = ref(null)
-const time = ref(null)
+// ข้อมูลที่โหลดจาก backend
+const faculties = ref([])
+const interestds = ref([])
 const subjectGroups = ref([])
+const grades = ref([])
+const subjects = ref([])
+const groupwork = ref([])
+const soloWork = ref([])
+const exam = ref([])
+const attendance = ref([])
+const instruction = ref([])
+const present = ref([])
+const experience = ref([])
+const challenge = ref([])
+const time = ref([])
+const solowork = ref(null)
+
+// ตัวแปรที่ผูกกับ v-model
+const studentId = ref('')
+const selectedStudentLevel = ref('null')
+const selectedFaculty = ref('null')
+const selectedGrade = ref('')
+const selectedInterestd = ref([])
+const selectedSubjectGroup = ref('')
+const selectedSubject = ref('')
+const selectedGroupwork = ref('')
+const selectedsolowork = ref('')
+const selectedexam = ref('')
+const selectedattendance = ref('')
+const selectedinstruction = ref('')
+const selectedpresent = ref('')
+const selectedexperience = ref('')
+const selectedchallenge = ref('')
+const selectedtime = ref('')
+
 const selectedGroupTypes = ref([])
 
 const resultGroups = ref([])
@@ -72,10 +95,53 @@ onMounted(async () => {
     try {
         const { data } = await api.get('/subject-groups')
         subjectGroups.value = Array.isArray(data) ? data : []
-    } catch (err) {
-        console.error("โหลดข้อมูลไม่สำเร็จ:", err?.response?.status, err?.response?.data || err.message)
-    }
-})
+
+        const [fRes, iRes, gRes, grRes, sgRes, gwRes, swRes, exRes, attRes, inRes, preRes,
+            expRes, cRes, tRes] = await Promise.all([
+                fetch("http://localhost:3000/faculty"),
+                fetch("http://localhost:3000/interestd"),
+                fetch("http://localhost:3000/subject-groups"),
+                fetch("http://localhost:3000/grades"),
+                fetch("http://localhost:3000/subjects/:groupId"),
+                fetch("http://localhost:3000/groupwork"),
+                fetch("http://localhost:3000/solowork"),
+                fetch("http://localhost:3000/exam"),
+                fetch("http://localhost:3000/attendance"),
+                fetch("http://localhost:3000/instruction"),
+                fetch("http://localhost:3000/present"),
+                fetch("http://localhost:3000/experience"),
+                fetch("http://localhost:3000/challenge"),
+                fetch("http://localhost:3000/time")
+            ])
+
+            faculties.value = await fRes.json()
+            interestds.value = await iRes.json()
+            subjectGroups.value = await gRes.json()
+            grades.value = await grRes.json()
+            subjects.value = await sgRes.json()
+            groupwork.value = await gwRes.json()
+            soloWork.value = await swRes.json()
+            exam.value = await exRes.json()
+            attendance.value = await attRes.json()
+            instruction.value = await inRes.json()
+            present.value = await preRes.json()
+            experience.value = await expRes.json()
+            challenge.value = await cRes.json()
+            time.value = await tRes.json()
+
+            const email = localStorage.getItem('userEmail')
+            if (!email) {
+                return router.push({ name: 'login', query: { redirect: '/review' } })
+            }
+
+            studentId.value = localStorage.getItem('student_ID') || ''
+            selectedStudentLevel.value = localStorage.getItem('studentLevel') || ''
+            selectedFaculty.value = localStorage.getItem('facultyId') || ''
+
+        } catch (err) {
+            console.error("โหลดข้อมูลไม่สำเร็จ:", err?.response?.status, err?.response?.data || err.message)
+        }
+    })
 
 // เปิด/ปิดการล็อกดีบักในคอนโซล (ตั้ง false เมื่อปล่อยโปรดักชัน)
 const DEBUG_LOG = import.meta.env.DEV || import.meta.env.VITE_DEBUG_LOG === 'true'
@@ -190,52 +256,14 @@ async function onSubmit() {
             <!-- ความสนใจ -->
             <div class="bg-[#F992AF]/50 p-6 rounded-3xl grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                    <h2 class="font-bold mb-2">ความสนใจ</h2>
-                    <!-- ปรับ :value ให้ตรงกับ interest_ID ใน DB ของคุณ -->
-                    <label class="block">
+                    <h2 class="font-bold mb-2">ความสนใจ(เลือกได้มากกว่า 1 คำตอบ)</h2>
+                    <label class="block" v-for="item in interestds" :key="item.interest_ID">
                         <input type="checkbox"
-                            class="checkbox checkbox-sm border-pink-400 bg-pink-300 checked:border-pink-700 checked:bg-pink-600"
-                            :value="1" v-model.number="selectedInterestd" />
-                        สุขภาพและชีวิตประจำวัน
-                    </label>
-                    <label class="block">
-                        <input type="checkbox"
-                            class="checkbox checkbox-sm border-pink-400 bg-pink-300 checked:border-pink-700 checked:bg-pink-600"
-                            :value="2" v-model.number="selectedInterestd" />
-                        ทักษะชีวิต คณิตศาสตร์ และการเงิน
-                    </label>
-                    <label class="block">
-                        <input type="checkbox"
-                            class="checkbox checkbox-sm border-pink-400 bg-pink-300 checked:border-pink-700 checked:bg-pink-600"
-                            :value="3" v-model.number="selectedInterestd" />
-                        พัฒนาตัวเองและจิตวิทยา
-                    </label>
-                    <label class="block">
-                        <input type="checkbox"
-                            class="checkbox checkbox-sm border-pink-400 bg-pink-300 checked:border-pink-700 checked:bg-pink-600"
-                            :value="4" v-model.number="selectedInterestd" />
-                        สังคม วัฒนธรรม และศาสนา
-                    </label>
-                    <label class="block">
-                        <input type="checkbox"
-                            class="checkbox checkbox-sm border-pink-400 bg-pink-300 checked:border-pink-700 checked:bg-pink-600"
-                            :value="5" v-model.number="selectedInterestd" />
-                        ศิลปะและภาษา
-                    </label>
-                    <label class="block">
-                        <input type="checkbox"
-                            class="checkbox checkbox-sm border-pink-400 bg-pink-300 checked:border-pink-700 checked:bg-pink-600"
-                            :value="6" v-model.number="selectedInterestd" />
-                        วิทยาศาสตร์ เทคโนโลยี และดิจิทัล
-                    </label>
-                    <label class="block">
-                        <input type="checkbox"
-                            class="checkbox checkbox-sm border-pink-400 bg-pink-300 checked:border-pink-700 checked:bg-pink-600"
-                            :value="7" v-model.number="selectedInterestd" />
-                        กฎหมายและพลเมือง
+                            class="checkbox checkbox-sm border-pink-400 bg-pink-300 checked:border-pink-700 checked:bg-pink-600 checked:text-orange-800"
+                            :value="item.interest_ID" v-model="selectedInterestd" />
+                        {{ item.interest_Name }}
                     </label>
                 </div>
-
                 <div>
                     <h2 class="font-bold mb-2">หมวดวิชาศึกษาทั่วไปที่นิสิตจะลงเรียน</h2>
                     <label class="block" v-for="g in subjectGroups" :key="g.GroupType_ID">
@@ -244,90 +272,58 @@ async function onSubmit() {
                             :value="g.GroupType_ID" v-model="selectedGroupTypes" />
                         {{ g.GroupType_Name }}
                     </label>
-
-
-
                 </div>
             </div>
 
             <!-- งานกลุ่ม -->
             <div class="bg-[#FFAE00]/35 p-6 rounded-3xl">
                 <h2 class="font-bold mb-3">เลือกคำตอบที่นิสิตคิดว่าตรงกับตนเองมากที่สุด</h2>
-                <fieldset class="mb-4 pl-5">
-                    <legend>1. งานกลุ่ม</legend>
-                    <div class="pl-5">
-                        <label class="block"><input type="radio" name="groupwork"
-                                class="radio radio-sm radio-error bg-white/50" :value="1" v-model.number="groupwork" />
-                            ไม่มี</label>
-                        <label class="block"><input type="radio" name="groupwork"
-                                class="radio radio-sm radio-error bg-white/50" :value="2" v-model.number="groupwork" />
-                            น้อย</label>
-                        <label class="block"><input type="radio" name="groupwork"
-                                class="radio radio-sm radio-error bg-white/50" :value="3" v-model.number="groupwork" />
-                            ปานกลาง</label>
-                        <label class="block"><input type="radio" name="groupwork"
-                                class="radio radio-sm radio-error bg-white/50" :value="4" v-model.number="groupwork" />
-                            มาก</label>
+                <fieldset class="mb-4 pl-5 space-y-2">
+                    <legend>
+                        1. นิสิตต้องการให้มีการมอบหมาย 
+                        <span style="color:red;">งานกลุ่ม</span> 
+                        ในรายวิชาอย่างไร <span style="color:red;">*</span>
+                    </legend>
+                    <div class="pl-5 space-y-2">
+                        <label class="block" v-for="item in groupwork" :key="item.groupwork_ID">
+                            <input type="radio" class="radio radio-sm radio-error bg-white/50" name="groupwork"
+                                :value="item.groupwork_ID" v-model="selectedGroupwork">
+                            {{ item.groupwork_Name }}
+                        </label>
                     </div>
                 </fieldset>
             </div>
 
             <div class="bg-[#FBCAA8]/95 p-6 rounded-3xl">
-                <fieldset class="pl-5">
-                    <legend>2. งานเดี่ยว</legend>
-                    <div class="pl-5">
-                        <label class="block"><input type="radio" name="solowork"
-                                class="radio radio-sm radio-error bg-white/50" :value="1" v-model.number="solowork" />
-                            ไม่มี</label>
-                        <label class="block"><input type="radio" name="solowork"
-                                class="radio radio-sm radio-error bg-white/50" :value="2" v-model.number="solowork" />
-                            น้อย</label>
-                        <label class="block"><input type="radio" name="solowork"
-                                class="radio radio-sm radio-error bg-white/50" :value="3" v-model.number="solowork" />
-                            ปานกลาง</label>
-                        <label class="block"><input type="radio" name="solowork"
-                                class="radio radio-sm radio-error bg-white/50" :value="4" v-model.number="solowork" />
-                            มาก</label>
+                <fieldset class="pl-5 space-y-2">
+                    <legend>
+                        2. นิสิตต้องการให้มีการมอบหมาย 
+                        <span style="color:red;">งานเดี่ยว</span> 
+                        ในรายวิชาอย่างไร <span style="color:red;">*</span>
+                    </legend>
+                    <div class="pl-5 space-y-2">
+                        <label class="block" v-for="item in soloWork" :key="item.solowork_ID">
+                            <input type="radio" class="radio radio-sm radio-error bg-white/50" name="solowork"
+                                :value="item.solowork_ID" v-model="selectedsolowork">
+                            {{ item.solowork_Name }}
+                        </label>
+
                     </div>
                 </fieldset>
             </div>
 
             <div class="bg-[#F992AF]/50 p-6 rounded-3xl">
-                <fieldset class="pl-5">
-                    <legend>3. การสอบ</legend>
+                <fieldset class="pl-5 space-y-2">
+                    <legend>
+                        3.นิสิตต้องการให้มีรูปแบบ
+                        <span style="color:red;">การสอบ</span> แบบใด 
+                        <span style="color:red;">*</span>
+                    </legend>
                     <div class="pl-5">
-                        <!-- เริ่มที่ 0 ให้ตรงกับเคส -->
-                        <label class="block">
-                            <input type="radio" name="exam" class="radio radio-sm radio-error bg-white/50" :value="'C0'"
-                                v-model="exam" />ไม่มีสอบ
-                        </label>
-                        <label class="block">
-                            <input type="radio" name="exam" class="radio radio-sm radio-error bg-white/50" :value="'C1'"
-                                v-model="exam" />มีแค่ สอบย่อย
-                        </label>
-                        <label class="block">
-                            <input type="radio" name="exam" class="radio radio-sm radio-error bg-white/50" :value="'C2'"
-                                v-model="exam" />สอบย่อย + midterm + final
-                        </label>
-                        <label class="block">
-                            <input type="radio" name="exam" class="radio radio-sm radio-error bg-white/50" :value="'C3'"
-                                v-model="exam" />midterm + final
-                        </label>
-                        <label class="block">
-                            <input type="radio" name="exam" class="radio radio-sm radio-error bg-white/50" :value="'C4'"
-                                v-model="exam" />มีสอบแค่ midterm
-                        </label>
-                        <label class="block">
-                            <input type="radio" name="exam" class="radio radio-sm radio-error bg-white/50" :value="'C5'"
-                                v-model="exam" />มีสอบแค่ final
-                        </label>
-                        <label class="block">
-                            <input type="radio" name="exam" class="radio radio-sm radio-error bg-white/50" :value="'C6'"
-                                v-model="exam" />สอบย่อย + midterm
-                        </label>
-                        <label class="block">
-                            <input type="radio" name="exam" class="radio radio-sm radio-error bg-white/50" :value="'C7'"
-                                v-model="exam" />สอบย่อย + final
+                        <label class="block" v-for="item in exam" :key="item.exam_ID">
+                            <input type="radio" class="radio radio-sm radio-error bg-white/50" name="exam"
+                                :value="item.exam_ID" v-model="selectedexam">
+                            {{ item.exam_Name }}
                         </label>
                     </div>
                 </fieldset>
@@ -335,99 +331,98 @@ async function onSubmit() {
             </div>
 
             <div class="bg-[#FFAE00]/35 p-6 rounded-3xl">
-                <fieldset class="pl-5">
-                    <legend>4. การเข้าเรียน</legend>
+                <fieldset class="pl-5 space-y-2">
+                    <legend>
+                        4.นิสิตต้องการให้มีการ <span style="color:red;">เช็คชื่อ</span> เข้าห้องเรียนอย่างไร 
+                        <span style="color:red;">*</span>
+                    </legend>
                     <div class="pl-5">
-                        <label class="block"><input type="radio" name="attendance"
-                                class="radio radio-sm radio-error bg-white/50" :value="1" v-model.number="attendance" />
-                            ไม่มีเช็คชื่อ</label>
-                        <label class="block"><input type="radio" name="attendance"
-                                class="radio radio-sm radio-error bg-white/50" :value="2" v-model.number="attendance" />
-                            มีเช็คชื่อบางครั้ง</label>
-                        <label class="block"><input type="radio" name="attendance"
-                                class="radio radio-sm radio-error bg-white/50" :value="3" v-model.number="attendance" />
-                            มีเช็คชื่อทุกครั้ง</label>
+                        <label class="block" v-for="item in attendance" :key="item.attendance_ID">
+                            <input type="radio" class="radio radio-sm radio-error bg-white/50" name="attendance"
+                                :value="item.attendance_ID" v-model="selectedattendance">
+                            {{ item.attendance_Name }}
+
+                        </label>
                     </div>
                 </fieldset>
             </div>
 
             <div class="bg-[#FBCAA8]/95 p-6 rounded-3xl">
-                <fieldset class="pl-5">
-                    <legend>5. รูปแบบการสอน</legend>
+                <fieldset class="pl-5 space-y-2">
+                    <legend>
+                        5.นิสิตต้องการให้รูปแบบ
+                        <span style="color:red;">การสอน</span> เป็นอย่างไร (ตอบได้มากกว่า 1 ข้อ)
+                        <span style="color:red;">*</span>
+                    </legend>
                     <div class="pl-5">
-                        <label class="block"><input type="radio" name="instruction"
-                                class="radio radio-sm radio-error bg-white/50" :value="1"
-                                v-model.number="instruction" /> ไม่ค่อยสอน</label>
-                        <label class="block"><input type="radio" name="instruction"
-                                class="radio radio-sm radio-error bg-white/50" :value="2"
-                                v-model.number="instruction" /> เน้นให้นิสิตทำความเข้าใจเอง</label>
-                        <label class="block"><input type="radio" name="instruction"
-                                class="radio radio-sm radio-error bg-white/50" :value="3"
-                                v-model.number="instruction" /> เน้นสอนให้นิสิตเข้าใจ</label>
+                        <label class="block" v-for="item in instruction" :key="item.instruction_ID">
+                            <input type="radio" class="radio radio-sm radio-error bg-white/50" name="instruction"
+                                :value="item.instruction_ID" v-model="selectedinstruction">
+                            {{ item.instruction_Name }}
+                        </label>
                     </div>
                 </fieldset>
             </div>
 
             <div class="bg-[#F992AF]/50 p-6 rounded-3xl">
                 <fieldset class="pl-5">
-                    <legend>6. การนำเสนอหน้าชั้นเรียน</legend>
-                    <div class="pl-5">
-                        <label class="block"><input type="radio" name="present"
-                                class="radio radio-sm radio-error bg-white/50" :value="1" v-model.number="present" />
-                            ไม่มี</label>
-                        <label class="block"><input type="radio" name="present"
-                                class="radio radio-sm radio-error bg-white/50" :value="2" v-model.number="present" />
-                            มีน้อย</label>
-                        <label class="block"><input type="radio" name="present"
-                                class="radio radio-sm radio-error bg-white/50" :value="3" v-model.number="present" />
-                            มีปานกลาง</label>
-                        <label class="block"><input type="radio" name="present"
-                                class="radio radio-sm radio-error bg-white/50" :value="4" v-model.number="present" />
-                            มีมาก</label>
+                    <legend>
+                        6.นิสิตชอบให้มีการ
+                        <span style="color:red;">นำเสนอหน้าชั้นเรียน</span> มากน้อยเพียงใด
+                        <span style="color:red;">*</span>
+                    </legend>
+                    <div class="pl-5 space-y-2">
+                        <label class="block" v-for="item in present" :key="item.present_ID">
+                            <input type="radio" class="radio radio-sm radio-error bg-white/50" name="present"
+                                :value="item.present_ID" v-model="selectedpresent">
+                            {{ item.present_Name }}
+
+                        </label>
                     </div>
                 </fieldset>
             </div>
 
             <div class="bg-[#FFAE00]/35 p-6 rounded-3xl">
                 <fieldset class="pl-5">
-                    <legend>7. ประสบการณ์ใหม่ๆ</legend>
-                    <div class="pl-5">
-                        <label class="block"><input type="radio" name="experience"
-                                class="radio radio-sm radio-error bg-white/50" :value="1" v-model.number="experience" />
-                            ไม่</label>
-                        <label class="block"><input type="radio" name="experience"
-                                class="radio radio-sm radio-error bg-white/50" :value="2" v-model.number="experience" />
-                            น้อย</label>
-                        <label class="block"><input type="radio" name="experience"
-                                class="radio radio-sm radio-error bg-white/50" :value="3" v-model.number="experience" />
-                            ปานกลาง</label>
-                        <label class="block"><input type="radio" name="experience"
-                                class="radio radio-sm radio-error bg-white/50" :value="4" v-model.number="experience" />
-                            มาก</label>
-                    </div>
+                    <legend>
+                        7.นิสิตต้องการ
+                        <span style="color:red;">ประสบการณ์ใหม่ๆ</span> จากวิชานี้หรือไม่
+                        <span style="color:red;">*</span>
+                    </legend>
+                <div class="pl-5 space-y-2">
+                        <label class="block" v-for="item in experience" :key="item.experience_ID">
+                            <input type="radio" class="radio radio-sm radio-error bg-white/50" name="experience"
+                                :value="item.experience_ID" v-model="selectedexperience">
+                            {{ item.experience_Name }}
+                        </label>
+                    </div>    
                 </fieldset>
             </div>
 
             <div class="bg-[#FBCAA8]/95 p-6 rounded-3xl">
                 <fieldset class="pl-5">
-                    <legend>8. ความท้าทาย</legend>
-                    <div class="pl-5">
-                        <label class="block"><input type="radio" name="challenge"
-                                class="radio radio-sm radio-error bg-white/50" :value="1" v-model.number="challenge" />
-                            ง่าย</label>
-                        <label class="block"><input type="radio" name="challenge"
-                                class="radio radio-sm radio-error bg-white/50" :value="2" v-model.number="challenge" />
-                            ปานกลาง</label>
-                        <label class="block"><input type="radio" name="challenge"
-                                class="radio radio-sm radio-error bg-white/50" :value="3" v-model.number="challenge" />
-                            ยาก</label>
+                    <legend>
+                        8.ระดับ
+                        <span style="color:red;">ความยากง่าย</span> ที่นิสิตต้องการ 
+                        <span style="color:red;">*</span>
+                    </legend>
+                    <div class="pl-5 space-y-2">
+                        <label class="block" v-for="item in challenge" :key="item.challenge_ID">
+                            <input type="radio" class="radio radio-sm radio-error bg-white/50" name="challenge"
+                                :value="item.challenge_ID" v-model="selectedchallenge">
+                            {{ item.challenge_Name }}
+                        </label>
                     </div>
                 </fieldset>
             </div>
 
             <div class="bg-[#F992AF]/50 p-6 rounded-3xl">
                 <fieldset class="pl-5">
-                    <legend>9. ช่วงเวลาที่เรียน</legend>
+                    <legend>
+                       9.
+                        <span style="color:red;">ช่วงเวลา</span> ในการเรียนที่นิสิตต้องการ(ช่วงเช้า = 8.00-11.50 , ช่วงบ่าย = 13.00-16.50)
+                        <span style="color:red;">*</span>
+                    </legend>
                     <div class="pl-5">
                         <label class="block"><input type="radio" name="time"
                                 class="radio radio-sm radio-error bg-white/50" :value="1" v-model.number="time" />
