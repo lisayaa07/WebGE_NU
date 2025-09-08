@@ -268,7 +268,7 @@ const instructionTokens = Array.isArray(selectedinstruction.value)
             <!-- ความสนใจ -->
             <div class="bg-[#F992AF]/50 p-6 rounded-3xl grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                   <h2 class="font-bold mb-2">ความสนใจ</h2>
+                   <h2 class="font-bold mb-2">ความสนใจ (เลือกได้มากกว่า 1 คำคอบ)</h2>
                     <label class="block"
                         v-for="it in interestds" :key="it.interest_ID"
                         :for="`interest-${it.interest_ID}`">
@@ -297,7 +297,11 @@ const instructionTokens = Array.isArray(selectedinstruction.value)
             <div class="bg-[#FFAE00]/35 p-6 rounded-3xl">
                 <h2 class="font-bold mb-3">เลือกคำตอบที่นิสิตคิดว่าตรงกับตนเองมากที่สุด</h2>
                 <fieldset class="mb-4 pl-5">
-                    <legend>1. งานกลุ่ม</legend>
+                     <legend>
+                        1. นิสิตต้องการให้มีการมอบหมาย 
+                        <span style="color:red;">งานกลุ่ม</span> 
+                        ในรายวิชาอย่างไร <span style="color:red;">*</span>
+                    </legend>
                     <div class="pl-5">
                     <label class="block" v-for="o in groupwork" :key="o.groupwork_ID">
                         <input type="radio" name="groupwork"
@@ -312,7 +316,11 @@ const instructionTokens = Array.isArray(selectedinstruction.value)
 
             <div class="bg-[#FBCAA8]/95 p-6 rounded-3xl">
                 <fieldset class="pl-5">
-                   <legend>2. งานเดี่ยว</legend>
+                   <legend>
+                        2. นิสิตต้องการให้มีการมอบหมาย 
+                        <span style="color:red;">งานเดี่ยว</span> 
+                        ในรายวิชาอย่างไร <span style="color:red;">*</span>
+                    </legend>
                     <div class="pl-5">
                     <label class="block" v-for="o in soloWork" :key="o.solowork_ID">
                         <input type="radio" name="solowork"
@@ -328,7 +336,11 @@ const instructionTokens = Array.isArray(selectedinstruction.value)
 
             <div class="bg-[#F992AF]/50 p-6 rounded-3xl">
                 <fieldset class="pl-5">
-                   <legend>3. การสอบ</legend>
+                  <legend>
+                        3.นิสิตต้องการให้มีรูปแบบ
+                        <span style="color:red;">การสอบ</span> แบบใด 
+                        <span style="color:red;">*</span>
+                    </legend>
                     <div class="pl-5">
                     <label class="block" v-for="o in exam" :key="o.exam_ID">
                         <input type="radio" name="exam"
@@ -345,7 +357,10 @@ const instructionTokens = Array.isArray(selectedinstruction.value)
 
             <div class="bg-[#FFAE00]/35 p-6 rounded-3xl">
                 <fieldset class="pl-5">
-                    <legend>4. การเข้าเรียน</legend>
+                    <legend>
+                        4.นิสิตต้องการให้มีการ <span style="color:red;">เช็คชื่อ</span> เข้าห้องเรียนอย่างไร 
+                        <span style="color:red;">*</span>
+                    </legend>
                     <div class="pl-5">
                     <label class="block" v-for="o in attendance" :key="o.attendance_ID">
                         <input type="radio" name="attendance"
@@ -361,7 +376,11 @@ const instructionTokens = Array.isArray(selectedinstruction.value)
 
             <div class="bg-[#FBCAA8]/95 p-6 rounded-3xl">
                 <fieldset class="pl-5">
-                    <legend>5. รูปแบบการสอน</legend>
+                    <legend>
+                        5.นิสิตต้องการให้รูปแบบ
+                        <span style="color:red;">การสอน</span> เป็นอย่างไร (ตอบได้มากกว่า 1 ข้อ)
+                        <span style="color:red;">*</span>
+                    </legend>
                     <div class="pl-5">
                     <label class="block" v-for="o in instruction" :key="o.instruction_ID"
                             :for="`inst-${o.instruction_ID}`">
@@ -380,7 +399,11 @@ const instructionTokens = Array.isArray(selectedinstruction.value)
             <!-- 6. นำเสนอ -->
             <div class="bg-[#F992AF]/50 p-6 rounded-3xl">
                 <fieldset class="pl-5">
-                    <legend>6. การนำเสนอหน้าชั้นเรียน</legend>
+                    <legend>
+                        6.นิสิตชอบให้มีการ
+                        <span style="color:red;">นำเสนอหน้าชั้นเรียน</span> มากน้อยเพียงใด
+                        <span style="color:red;">*</span>
+                    </legend>
                     <div class="pl-5">
                     <label class="block" v-for="o in present" :key="o.present_ID">
                         <input type="radio" name="present"
@@ -396,7 +419,11 @@ const instructionTokens = Array.isArray(selectedinstruction.value)
                     
             <div class="bg-[#FFAE00]/35 p-6 rounded-3xl">
                 <fieldset class="pl-5">
-                    <legend>7. ประสบการณ์ใหม่ๆ</legend>
+                    <legend>
+                        7.นิสิตต้องการ
+                        <span style="color:red;">ประสบการณ์ใหม่ๆ</span> จากวิชานี้หรือไม่
+                        <span style="color:red;">*</span>
+                    </legend>
                     <div class="pl-5">
                     <label class="block" v-for="o in experience" :key="o.experience_ID">
                         <input type="radio" name="experience"
@@ -411,7 +438,11 @@ const instructionTokens = Array.isArray(selectedinstruction.value)
 
                 <div class="bg-[#FBCAA8]/95 p-6 rounded-3xl">
                   <fieldset class="pl-5">
-                    <legend>8. ความท้าทาย</legend>
+                    <legend>
+                        8.ระดับ
+                        <span style="color:red;">ความยากง่าย</span> ที่นิสิตต้องการ 
+                        <span style="color:red;">*</span>
+                    </legend>
                     <div class="pl-5">
                     <label class="block" v-for="o in challenge" :key="o.challenge_ID">
                         <input type="radio" name="challenge"
@@ -426,7 +457,11 @@ const instructionTokens = Array.isArray(selectedinstruction.value)
 
                 <div class="bg-[#F992AF]/50 p-6 rounded-3xl">
                     <fieldset class="pl-5">
-                    <legend>9. ช่วงเวลาที่เรียน</legend>
+                    <legend>
+                       9.
+                        <span style="color:red;">ช่วงเวลา</span> ในการเรียนที่นิสิตต้องการ(ช่วงเช้า = 8.00-11.50 , ช่วงบ่าย = 13.00-16.50)
+                        <span style="color:red;">*</span>
+                    </legend>
                     <div class="pl-5">
                     <label class="block" v-for="o in time" :key="o.time_ID">
                         <input type="radio" name="time"

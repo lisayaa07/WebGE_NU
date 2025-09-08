@@ -19,8 +19,6 @@ const present = ref([])
 const experience = ref([])
 const challenge = ref([])
 const time = ref([])
-
-
 // ตัวแปรที่ผูกกับ v-model
 const studentId = ref('')
 const selectedStudentLevel = ref('null')
@@ -33,7 +31,7 @@ const selectedGroupwork = ref('')
 const selectedsolowork = ref('')
 const selectedexam = ref('')
 const selectedattendance = ref('')
-const selectedinstruction = ref('')
+const selectedinstruction = ref([]) 
 const selectedpresent = ref('')
 const selectedexperience = ref('')
 const selectedchallenge = ref('')
@@ -130,6 +128,15 @@ async function onSubmit(e) {
     if (!selectedFaculty.value) return alert('กรุณาเลือกคณะ')
     if (!selectedGroupType.value) return alert('กรุณาเลือกหมวดวิชา')
     if (!selectedSubject.value) return alert('กรุณาเลือกรายวิชา')
+    if (!selectedGroupwork.value) return alert('กรุณาตอบคำถามข้อที่ 1')
+    if (!selectedsolowork.value) return alert('กรุณาตอบคำถามข้อที่ 2')
+    if (!selectedexam.value) return alert('กรุณาตอบคำถามข้อที่ 3')
+    if (!selectedattendance.value) return alert('กรุณาตอบคำถามข้อที่ 4')
+    if (selectedinstruction.value.length === 0) return alert('กรุณาตอบคำถามข้อที่ 5')
+    if (!selectedpresent.value) return alert('กรุณาตอบคำถามข้อที่ 6')
+    if (!selectedexperience.value) return alert('กรุณาตอบคำถามข้อที่ 7')
+    if (!selectedchallenge.value) return alert('กรุณาตอบคำถามข้อที่ 8')
+    if (!selectedtime.value) return alert('กรุณาตอบคำถามข้อที่ 9')
 
     // เตรียม payload ให้ตรงกับ backend
     const payload = {
@@ -144,7 +151,7 @@ async function onSubmit(e) {
         solowork: selectedsolowork.value,
         exam: selectedexam.value,
         attendance: selectedattendance.value,
-        instruction: selectedinstruction.value,
+        instruction: selectedinstruction.value.join(','),
         present: selectedpresent.value,
         experience: selectedexperience.value,
         challenge: selectedchallenge.value,
@@ -152,6 +159,7 @@ async function onSubmit(e) {
 
         grade: selectedGrade.value,
         review: reviewText.value
+        
     }
 
     try {
@@ -188,7 +196,7 @@ function resetForm() {
     selectedsolowork.value = ''
     selectedexam.value = ''
     selectedattendance.value = ''
-    selectedinstruction.value = ''
+    selectedinstruction.value = []
     selectedpresent.value = ''
     selectedexperience.value = ''
     selectedchallenge.value = ''
@@ -289,7 +297,11 @@ function resetForm() {
             <div class="bg-[#FFAE00]/35 p-6 rounded-3xl">
                 <h2 class="font-bold mb-3">เลือกคำตอบที่นิสิตคิดว่าตรงกับตนเองมากที่สุด</h2>
                 <fieldset class="mb-4 pl-5">
-                    <legend>1. งานกลุ่ม</legend>
+                    <legend>
+                        1. มีการมอบหมาย 
+                        <span style="color:red;">งานกลุ่ม</span> 
+                        ในรายวิชาอย่างไร <span style="color:red;">*</span>
+                    </legend>
                     <div class="pl-5 space-y-2">
                         <label class="block" v-for="item in groupwork" :key="item.groupwork_ID">
                             <input type="radio" class="radio radio-sm radio-error bg-white/50" name="groupwork"
@@ -302,7 +314,11 @@ function resetForm() {
 
             <div class="bg-[#FBCAA8]/95 p-6 rounded-3xl">
                 <fieldset class="pl-5">
-                    <legend>2. งานเดี่ยว</legend>
+                    <legend>
+                        2. มีการมอบหมาย 
+                        <span style="color:red;">งานเดี่ยว</span> 
+                        ในรายวิชาอย่างไร <span style="color:red;">*</span>
+                    </legend>
                     <div class="pl-5">
                         <label class="block" v-for="item in soloWork" :key="item.solowork_ID">
                             <input type="radio" class="radio radio-sm radio-error bg-white/50" name="solowork"
@@ -316,7 +332,11 @@ function resetForm() {
 
             <div class="bg-[#F992AF]/50 p-6 rounded-3xl">
                 <fieldset class="pl-5">
-                    <legend>3. การสอบ</legend>
+                    <legend>
+                        3.นิสิตต้องการให้มีรูปแบบ
+                        <span style="color:red;">การสอบ</span> แบบใด 
+                        <span style="color:red;">*</span>
+                    </legend>
                     <div class="pl-5">
                         <label class="block" v-for="item in exam" :key="item.exam_ID">
                             <input type="radio" class="radio radio-sm radio-error bg-white/50" name="exam"
@@ -329,7 +349,10 @@ function resetForm() {
 
             <div class="bg-[#FFAE00]/35 p-6 rounded-3xl">
                 <fieldset class="pl-5">
-                    <legend>4. การเข้าเรียน</legend>
+                    <legend>
+                        4.นิสิตต้องการให้มีการ <span style="color:red;">เช็คชื่อ</span> เข้าห้องเรียนอย่างไร 
+                        <span style="color:red;">*</span>
+                    </legend>
                     <div class="pl-5">
                         <label class="block" v-for="item in attendance" :key="item.attendance_ID">
                             <input type="radio" class="radio radio-sm radio-error bg-white/50" name="attendance"
@@ -342,21 +365,40 @@ function resetForm() {
             </div>
 
             <div class="bg-[#FBCAA8]/95 p-6 rounded-3xl">
-                <fieldset class="pl-5">
-                    <legend>5. รูปแบบการสอน</legend>
+                <fieldset class="pl-5 space-y-2">
+                    <legend>
+                    5.นิสิตต้องการให้รูปแบบ <span style="color:red;">การสอน</span> เป็นอย่างไร (ตอบได้มากกว่า 1 ข้อ)
+                    <span style="color:red;">*</span>
+                    </legend>
+
                     <div class="pl-5">
-                        <label class="block" v-for="item in instruction" :key="item.instruction_ID">
-                            <input type="radio" class="radio radio-sm radio-error bg-white/50" name="instruction"
-                                :value="item.instruction_ID" v-model="selectedinstruction">
-                            {{ item.instruction_Name }}
-                        </label>
+                    <label
+                        class="flex items-center gap-2 py-1"
+                        v-for="item in instruction"
+                        :key="item.instruction_ID"
+                        :for="`inst-${item.instruction_ID}`"
+                    >
+                        <input
+                        type="checkbox"
+                        class="checkbox checkbox-sm border-pink-700 bg-white/50"
+                        :id="`inst-${item.instruction_ID}`"
+                        :value="item.instruction_ID"
+                        v-model="selectedinstruction"     
+                        />
+                        <span>{{ item.instruction_Name }}</span>
+                    </label>
                     </div>
                 </fieldset>
             </div>
 
+
             <div class="bg-[#F992AF]/50 p-6 rounded-3xl">
                 <fieldset class="pl-5">
-                    <legend>6. การนำเสนอหน้าชั้นเรียน</legend>
+                    <legend>
+                        6.นิสิตชอบให้มีการ
+                        <span style="color:red;">นำเสนอหน้าชั้นเรียน</span> มากน้อยเพียงใด
+                        <span style="color:red;">*</span>
+                    </legend>
                     <div class="pl-5">
                         <label class="block" v-for="item in present" :key="item.present_ID">
                             <input type="radio" class="radio radio-sm radio-error bg-white/50" name="present"
@@ -370,7 +412,11 @@ function resetForm() {
 
             <div class="bg-[#FFAE00]/35 p-6 rounded-3xl">
                 <fieldset class="pl-5">
-                    <legend>7. นิสิตอยากได้ประสบการณ์ใหม่ๆในการเรียนมากน้อยแค่ไหน</legend>
+                   <legend>
+                        7.นิสิตต้องการ
+                        <span style="color:red;">ประสบการณ์ใหม่ๆ</span> จากวิชานี้หรือไม่
+                        <span style="color:red;">*</span>
+                    </legend>
                     <div class="pl-5">
                         <label class="block" v-for="item in experience" :key="item.experience_ID">
                             <input type="radio" class="radio radio-sm radio-error bg-white/50" name="experience"
@@ -383,7 +429,11 @@ function resetForm() {
 
             <div class="bg-[#FBCAA8]/95 p-6 rounded-3xl">
                 <fieldset class="pl-5">
-                    <legend>8. ความท้าทาย</legend>
+                    <legend>
+                        8.ระดับ
+                        <span style="color:red;">ความยากง่าย</span> ที่นิสิตต้องการ 
+                        <span style="color:red;">*</span>
+                    </legend>
                     <div class="pl-5">
                         <label class="block" v-for="item in challenge" :key="item.challenge_ID">
                             <input type="radio" class="radio radio-sm radio-error bg-white/50" name="challenge"
@@ -396,7 +446,11 @@ function resetForm() {
 
             <div class="bg-[#F992AF]/50 p-6 rounded-3xl">
                 <fieldset class="pl-5">
-                    <legend>9. ช่วงเวลาที่เรียน</legend>
+                    <legend>
+                       9.
+                        <span style="color:red;">ช่วงเวลา</span> ในการเรียนที่นิสิตต้องการ(ช่วงเช้า = 8.00-11.50 , ช่วงบ่าย = 13.00-16.50)
+                        <span style="color:red;">*</span>
+                    </legend>
                     <div class="pl-5">
                         <label class="block" v-for="item in time" :key="item.time_ID">
                             <input type="radio" class="radio radio-sm radio-error bg-white/50" name="time"
