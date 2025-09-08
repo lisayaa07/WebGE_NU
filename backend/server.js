@@ -195,8 +195,11 @@ app.get("/time", (req, res) => {
   });
 });
 
-app.post("/submit-form", (req, res) => {
-  console.log("📦 ฟอร์มที่รับมา:", req.body);
+// ✅ ต้องแน่ใจว่า pool มาจาก mysql2/promise เช่น
+// import mysql from 'mysql2/promise';
+// const pool = mysql.createPool({ ... });
+
+app.post('/submit-form', async (req, res) => {
   const {
     student_id,
     subjectGroup,
@@ -204,83 +207,104 @@ app.post("/submit-form", (req, res) => {
     faculty,
     interestd,
     subject,
-    groupwork,
-    solowork,
-    exam,
-    attendance,
-    instruction,
-    present,
-    experience,
-    challenge,
-    time,
-    grade,
-    review
+    groupwork, solowork, exam, attendance,
+    instructions,          // array ได้
+    instruction,           // เดี่ยว/CSV ก็ได้ (แบ็กอัป)
+    present, experience, challenge, time,
+    grade, review
   } = req.body;
 
-  const timestamp = new Date().toISOString().slice(0, 19).replace("T", " ");
+  const asArray = (v) => Array.isArray(v) ? v : (v == null ? [] : [v]);
+  const normalizeSubject = (v) => {
+    const d = String(v ?? '').trim().replace(/\D/g, '');
+    return d ? d.padStart(6, '0') : null;
+  };
+  const groupType = String(subjectGroup ?? '').toUpperCase(); // คาดหวัง 'G1'|'G2'|'G3'
 
-  const interestds = Array.isArray(interestd) ? interestd.join(",") : interestd;
+  // รวม tokens จาก instructions[] และ/หรือ instruction (CSV/เดี่ยว)
+  const instrTokens = [
+    ...asArray(instructions),
+    ...String(instruction ?? '').split(','),
+  ]
+  .map(x => String(x).trim())
+  .filter(Boolean);
 
-  console.log("❤️ interestd =", interestd);
-  console.log("💡 interestds =", interestds);
+  const conn = await pool.getConnection();
+  await conn.beginTransaction();
+  try {
+    // --- ตรวจ Subject ---
+    const subjectId = normalizeSubject(subject);
+    if (!subjectId) throw new Error('SUBJECT_REQUIRED');
+    const [[sub]] = await conn.query('SELECT subject_ID FROM Subject WHERE subject_ID=?', [subjectId]);
+    if (!sub) throw new Error(`SUBJECT_NOT_FOUND:${subjectId}`);
 
-  const insertFormGe = `
-    INSERT INTO Form_ge (student_ID, faculty_ID, student_level, interestd, timestamp)
-    VALUES (?, ?, ?, ?, ?)
-
-  `;
-
-  connection.query(insertFormGe, [student_id, faculty, student_level, interestds, timestamp], (err, result) => {
-    if (err) {
-      console.error("Insert Form_ge error:", err);
-      return res.status(500).send("Insert Form_ge failed");
+    // --- map attendance (ไม่เจอให้เป็น NULL เพื่อไม่ชน FK) ---
+    let attendanceId = (attendance ?? '').toString().trim() || null;
+    if (attendanceId) {
+      const [[am]] = await conn.query('SELECT attendance_ID FROM Attendance_map WHERE attendance_ID=?', [attendanceId]);
+      if (!am) attendanceId = null;
     }
 
-    const formGeId = result.insertId;
+    // --- Insert Form_ge ---
+    const interestCsv = asArray(interestd).filter(Boolean).join(',');
+    const facultyCode = (faculty && String(faculty).trim()) || 'F9';
+    const [geRes] = await conn.execute(
+      `INSERT INTO Form_ge (student_ID, faculty_ID, student_level, interestd, timestamp)
+       VALUES (?, ?, ?, ?, NOW())`,
+      [student_id || null, facultyCode, Number(student_level) || null, interestCsv || null]
+    );
+    const fgId = geRes.insertId;
 
-    const insertReview = `
-      INSERT INTO Form_review (
-        fg_ID,
-        group_type,
-        subject_ID,
-        groupwork_ID,
-        solowork_ID,
-        exam_ID,
-        attendance_ID,
-        instruction_ID,
-        present_ID,
-        experience_ID,
-        challenge_ID,
-        time_ID,
-        grade_ID,
-        review
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `;
+    // --- Insert Form_review (ปล่อย instruction_ID เป็น NULL ก่อน) ---
+    const [frRes] = await conn.execute(
+      `INSERT INTO Form_review (
+         fg_ID, group_type, subject_ID, grade_ID, review,
+         groupwork_ID, solowork_ID, exam_ID, attendance_ID,
+         instruction_ID, present_ID, experience_ID, challenge_ID, time_ID
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?)`,
+      [
+        fgId, groupType, subjectId, grade ?? null, review ?? null,
+        groupwork ?? null, solowork ?? null, exam ?? null, attendanceId,
+        present ?? null, experience ?? null, challenge ?? null, time ?? null
+      ]
+    );
+    const frId = frRes.insertId;
 
-    connection.query(insertReview, [
-      formGeId,
-      subjectGroup,
-      subject,
-      groupwork,
-      solowork,
-      exam,
-      attendance,
-      instruction,
-      present,
-      experience,
-      challenge,
-      time,
-      grade,
-      review
-    ], (err2) => {
-      if (err2) {
-        console.error("Insert Form_review error:", err2);
-        return res.status(500).send("Insert Form_review failed");
+    // --- Insert หลายค่าไปตารางเชื่อม (validate กับ Instruction_map) ---
+    let csvForDisplay = '';
+    if (instrTokens.length) {
+      const [rows] = await conn.query(
+        `SELECT instruction_ID FROM Instruction_map WHERE instruction_ID IN (?);`,
+        [instrTokens]
+      );
+      const valid = [...new Set(rows.map(r => r.instruction_ID))];
+      if (valid.length) {
+        const values = valid.map(code => [frId, code]);
+        await conn.query(
+          `INSERT IGNORE INTO Form_review_instruction (fr_ID, instruction_ID) VALUES ?`,
+          [values]
+        );
+        csvForDisplay = valid.join(','); // ใช้โชว์/ค้นในบาง endpoint ได้
       }
+    }
 
-      res.send("✅ ข้อมูลถูกบันทึกเรียบร้อยแล้ว");
-    });
-  });
+    // --- (ออปชันแนะนำ) ซิงก์ค่า CSV กลับไปคอลัมน์ Form_review.instruction_ID เพื่อไม่ให้เป็น NULL ---
+    await conn.execute(
+      `UPDATE Form_review SET instruction_ID = ? WHERE fr_ID = ?`,
+      [csvForDisplay, frId]
+    );
+
+    await conn.commit();
+    res.status(201).json({ ok: true, fr_ID: frId });
+  } catch (e) {
+    await conn.rollback();
+    console.error('submit-form error:', e);
+    const msg = String(e.message || e);
+    if (msg.startsWith('SUBJECT_')) return res.status(400).json({ ok:false, error: msg });
+    res.status(500).json({ ok:false, error: 'SERVER_ERROR' });
+  } finally {
+    conn.release();
+  }
 });
 
 
@@ -458,22 +482,49 @@ app.post('/register', (req, res) => {
 
 
 
-
 /* ---------- Case-based Reasoning ---------- */
+
 app.post('/cbr-match', (req, res) => {
   const {
-    interestd = [],                         // เช่น [1,3,6] (จากฟอร์ม)
-    groupwork, solowork, exam, attendance, instruction,
+    interestd = [],
+    groupwork, solowork, exam, attendance,
+    instructions = [],      // ✅ ใหม่: รองรับหลายค่า
+    instruction = '',       // เดิม: ค่าเดียว (เผื่อยังส่งมา)
     present, experience, challenge, time,
     group_types = [],
-    grade: userGrade,                    // กรองหมวดวิชา (อาจเป็นรหัสหรือเลขให้ตรง fr.group_type)
-    weights = {}
+    grade: userGrade,
+    weights = {},
+    debug
   } = req.body;
 
-  const wantDebug = Boolean(req.body.debug) || process.env.DEBUG_CBR === '1'
+  const wantDebug = Boolean(debug) || process.env.DEBUG_CBR === '1';
 
+  // --- helpers เฉพาะมิตินี้ ---
+  const parseCsv = (s) =>
+    String(s ?? '')
+      .split(',')
+      .map(x => String(x).trim())
+      .filter(Boolean);
 
-  // --- SQL (JOIN ชื่อกลุ่ม) ---
+  const toD = (v) => {
+    const s = String(v).trim().toUpperCase();        // 'd1' -> 'D1'
+    if (/^\d+$/.test(s)) return 'D' + s;             // '1' -> 'D1'
+    const m = s.match(/^D\s*(\d+)$/i);               // 'D 1' -> 'D1'
+    return m ? 'D' + m[1] : s;                       // คืนเดิมถ้าไม่แมตช์
+  };
+
+  const normInstrTokens = (arrOrCsv) => {
+    const arr = Array.isArray(arrOrCsv) ? arrOrCsv : parseCsv(arrOrCsv);
+    // unique & คงลำดับที่ติ๊ก (พอประมาณ)
+    const seen = new Set();
+    const out = [];
+    for (const v of arr.map(toD)) {
+      if (!seen.has(v)) { seen.add(v); out.push(v); }
+    }
+    return out;
+  };
+
+  // --- SQL: ดึง CSV ของ instruction จากตารางเชื่อม ถ้ามี; ถ้าไม่มี ใช้คอลัมน์เดิม ---
   let sql = `
     SELECT
       fr.subject_ID,
@@ -481,20 +532,26 @@ app.post('/cbr-match', (req, res) => {
       fr.group_type,
       gt.GroupType_Name,
       fr.groupwork_ID, fr.solowork_ID, fr.exam_ID, fr.attendance_ID,
-      fr.instruction_ID, fr.present_ID, fr.experience_ID, fr.challenge_ID,
-      fr.time_ID, fr.grade_ID, gm.grade_Name AS grade_Name, fr.review,
+      fr.instruction_ID,             -- อาจเป็นค่าว่าง/CSV เก่า
+      COALESCE(fri.instruction_csv, fr.instruction_ID) AS instruction_csv,  -- ✅ ใช้ csv จากตารางเชื่อม
+      fr.present_ID, fr.experience_ID, fr.challenge_ID, fr.time_ID,
+      fr.grade_ID, gm.grade_Name, fr.review,
       fg.interestd
     FROM Form_review AS fr
     JOIN Form_ge  AS fg ON fg.id = fr.fg_ID
     LEFT JOIN Subject    AS s  ON s.subject_ID = fr.subject_ID
     LEFT JOIN Group_Type AS gt ON gt.GroupType_ID = fr.group_type
-    LEFT JOIN Grade_map  AS gm ON gm.grade_ID  = fr.grade_ID  
+    LEFT JOIN Grade_map  AS gm ON gm.grade_ID  = fr.grade_ID
+    LEFT JOIN (
+      SELECT fr_ID, GROUP_CONCAT(instruction_ID ORDER BY instruction_ID) AS instruction_csv
+      FROM Form_review_instruction
+      GROUP BY fr_ID
+    ) AS fri ON fri.fr_ID = fr.fr_ID
   `;
   const params = [];
 
   if (Array.isArray(group_types) && group_types.length) {
-    const placeholders = group_types.map(() => '?').join(',');
-    sql += ` WHERE fr.group_type IN (${placeholders})`;
+    sql += ` WHERE fr.group_type IN (${group_types.map(()=>'?').join(',')})`;
     params.push(...group_types);
   }
 
@@ -509,7 +566,7 @@ app.post('/cbr-match', (req, res) => {
       const baseW = {
         interestd: 20,
         exam: 15,
-        instruction: 12,
+        instruction: 12,  // ✅ ใช้กับ Dice ได้เลย
         groupwork: 10,
         solowork: 10,
         experience: 8,
@@ -518,13 +575,9 @@ app.post('/cbr-match', (req, res) => {
         attendance: 2,
         present: 1,
       };
-      // ถ้าหน้าเว็บส่ง weights มา จะ merge ทับค่า default
       const W = { ...baseW, ...(weights || {}) };
-      const merged = { ...baseW, ...weights };
 
-
-
-      // แปลง interest เป็น token ตัวเลขเสมอ: ['A1','F3',6] -> ['1','3','6']
+      // ---------- helpers เดิม (ยกมาจากไฟล์คุณ) ----------
       function normalizeInterestTokens(value) {
         if (value == null) return [];
         const tokens = Array.isArray(value) ? value : String(value).split(',');
@@ -534,32 +587,26 @@ app.post('/cbr-match', (req, res) => {
           .map(t => {
             const m = t.match(/\d+/);
             if (!m) return null;
-            const n = parseInt(m[0], 10);       // <<— บังคับเป็นตัวเลข
+            const n = parseInt(m[0], 10);
             return Number.isFinite(n) ? String(n) : null;
           })
           .filter(Boolean);
-        return [...new Set(out)]; // ตัดซ้ำ
+        return [...new Set(out)];
       }
-
-
-      // Dice ระหว่าง token (ข้ามมิตินี้ถ้า user หรือ case ว่าง)
       function diceTokens(A, B) {
         if (!Array.isArray(A) || !Array.isArray(B) || A.length === 0 || B.length === 0) return null;
         const a = new Set(A), b = new Set(B);
         const inter = [...a].filter(x => b.has(x)).length;
         return (2 * inter) / (a.size + b.size);
       }
-
       function parseCodeLevel(v) {
         if (v == null) return { prefix: null, level: null };
         const s = String(v).trim();
-        // ถ้ากรอกมาเป็นเลขล้วน
         if (/^\d+(\.\d+)?$/.test(s)) return { prefix: null, level: Number(s) };
         const m = s.match(/^([A-Za-z]+)?\s*(\d+(?:\.\d+)?)$/);
         if (!m) return { prefix: null, level: null };
         return { prefix: (m[1] || '').toUpperCase(), level: Number(m[2]) };
       }
-
       function simCodeOrdinal(userVal, caseVal, { expectedPrefix = null, min = 1, max = 4, onPrefixMismatch = 'zero' } = {}) {
         const u = parseCodeLevel(userVal);
         const c = parseCodeLevel(caseVal);
@@ -568,173 +615,106 @@ app.post('/cbr-match', (req, res) => {
           const badC = c.prefix && c.prefix !== expectedPrefix;
           if (badU || badC) return onPrefixMismatch === 'skip' ? null : 0;
         }
-        if (!Number.isFinite(u.level) || !Number.isFinite(c.level)) return null; // ข้ามมิติถ้าข้อมูลไม่ครบ
-
+        if (!Number.isFinite(u.level) || !Number.isFinite(c.level)) return null;
         const range = Number(max) - Number(min);
         if (range <= 0) return u.level === c.level ? 1 : 0;
-
         const diff = Math.abs(u.level - c.level) / range;
-        const sim = 1 - diff;
-        return Math.max(0, Math.min(1, sim));
+        return Math.max(0, Math.min(1, 1 - diff));
       }
-
-      // inverse-abs สำหรับสเกลลำดับ
       const simInverseAbs = (a, b) => {
         const an = Number(a), bn = Number(b);
         if (!Number.isFinite(an) || !Number.isFinite(bn)) return null;
         return 1 / (1 + Math.abs(an - bn));
       };
-
       function ensurePrefix(val, prefix) {
         if (val == null) return null;
         const s = String(val).trim();
-        if (/^\d+$/.test(s)) return prefix + s;   // "0" -> "C0"
+        if (/^\d+$/.test(s)) return prefix + s;
         return s;
       }
 
-      const GRADE_SCORE = { 'A': 7, 'B+': 6, 'B': 5, 'C+': 4, 'C': 3, 'D+': 2, 'D': 1, 'F': 0 };
+      // ---------- เตรียมค่าผู้ใช้ ----------
+      const userInterestTokens = normalizeInterestTokens(interestd);
+      // ✅ รวม instruction หลายค่า (instructions[]) + เดี่ยว (instruction)
+      const userInstrTokens = normInstrTokens([
+        ... (Array.isArray(instructions) ? instructions : []),
+        ... parseCsv(instruction)
+      ]);
 
-      function gradeScoreFromItem(it) {
-        const raw = String(it.grade_Name ?? it.grade_ID ?? '').toUpperCase().trim();
-        // พยายามดึง token เกรดจากชื่อหรือรหัส เช่น "B1" -> "B", "C+" -> "C+"
-        const m = raw.match(/A|B\+|B|C\+|C|D\+|D|F/);
-        const key = m ? m[0] : null;
-        return key in GRADE_SCORE ? GRADE_SCORE[key] : -1; // -1 = ไม่รู้เกรด
-      }
-
-      function bySimThenGrade(a, b) {
-        const sa = Number(a.similarity) || 0;
-        const sb = Number(b.similarity) || 0;
-        if (sb !== sa) return sb - sa;              // 1) เปอร์เซ็นต์มาก่อน
-        const ga = gradeScoreFromItem(a);
-        const gb = gradeScoreFromItem(b);
-        if (gb !== ga) return gb - ga;              // 2) เกรดสูงกว่า ชนะ
-        // 3) กันกระพือด้วยการเรียงตาม id
-        return String(a.subject_ID).localeCompare(String(b.subject_ID));
-      }
-
-      function dedupeBySubjectKeepBest(arr) {
-        // เรียงให้เคสดีสุดมาก่อน แล้วเก็บตัวแรกของแต่ละ subject_ID
-        const sorted = arr.slice().sort(bySimThenGrade);
-        const seen = new Set();
-        const out = [];
-        for (const it of sorted) {
-          const key = String(it.subject_ID);
-          if (seen.has(key)) continue;
-          seen.add(key);
-          out.push(it);
-        }
-        return out;
-      }
-
-
-      // ---------- คำนวณแต่ละเคส ----------
+      // ---------- ประมวลผลเคส ----------
       const results = rows.map((r) => {
-        const userInterestTokens = normalizeInterestTokens(interestd);
         const caseInterestTokens = normalizeInterestTokens(r.interestd);
+        // ✅ ดึงโค้ดรูปแบบการสอนของเคสจาก instruction_csv (หรือคอลัมน์เดิม)
+        const caseInstrTokens = normInstrTokens(r.instruction_csv);
 
-
-
-        // ถ้าคุณใช้รหัส B/C/D ให้เห็น level ที่แยกได้
-
-
-        const uExam = parseCodeLevel(exam);
-        const cExam = parseCodeLevel(r.exam_ID);
-        const uInstr = parseCodeLevel(instruction);
-        const cInstr = parseCodeLevel(r.instruction_ID);
-
+        // ถ้าคุณยังอยากได้ ordinal สำหรับ “ค่าเดียว” ก็ปล่อยไว้ได้ แต่ให้ Dice เป็นตัวหลัก
         const sims = {
-          interestd: diceTokens(userInterestTokens, caseInterestTokens), // อาจเป็น null ถ้าฝั่งใดว่าง
-          groupwork: simInverseAbs(groupwork, r.groupwork_ID),
-          solowork: simInverseAbs(solowork, r.solowork_ID),
-          exam: simCodeOrdinal(ensurePrefix(exam, 'C'), r.exam_ID, { expectedPrefix: 'C', min: 0, max: 7 }),
-          attendance: simInverseAbs(attendance, r.attendance_ID),
-          instruction: simCodeOrdinal(instruction, r.instruction_ID, { expectedPrefix: 'D', min: 1, max: 3 }),
-          present: simInverseAbs(present, r.present_ID),
-          experience: simInverseAbs(experience, r.experience_ID),
-          challenge: simInverseAbs(challenge, r.challenge_ID),
-          time: simInverseAbs(time, r.time_ID), // 1..2 ก็ได้ 1/(1+|a-b|)
+          interestd:  diceTokens(userInterestTokens, caseInterestTokens),
+          groupwork:  simInverseAbs(groupwork,   r.groupwork_ID),
+          solowork:   simInverseAbs(solowork,    r.solowork_ID),
+          exam:       simCodeOrdinal(ensurePrefix(exam, 'C'), r.exam_ID, { expectedPrefix: 'C', min: 0, max: 7 }),
+          attendance: simInverseAbs(attendance,  r.attendance_ID),
+
+          // ✅ ใช้ Dice สำหรับ “หลายค่า”
+          instruction: diceTokens(userInstrTokens, caseInstrTokens),
+
+          present:    simInverseAbs(present,     r.present_ID),
+          experience: simInverseAbs(experience,  r.experience_ID),
+          challenge:  simInverseAbs(challenge,   r.challenge_ID),
+          time:       simInverseAbs(time,        r.time_ID),
         };
 
-        // รวมถ่วงน้ำหนัก: นับเฉพาะมิติที่มี sim จริง (ไม่ใช่ null)
+        // รวมคะแนนตามน้ำหนัก (นับเฉพาะ sim ที่ไม่ใช่ null)
         let score = 0, wsum = 0;
-        const contribs = {};      // เก็บ w, s, w*s ต่อมิติ (เพื่อ debug/UI)
-        const weightsUsed = {};   // เก็บน้ำหนักเฉพาะมิติที่ใช้งานจริง
+        const contribs = {};
+        const weightsUsed = {};
         for (const k of Object.keys(sims)) {
           const s = sims[k];
           if (s == null || !Number.isFinite(s)) continue;
           const w = Number(W[k]) || 0;
           if (w <= 0) continue;
           score += w * s;
-          wsum += w;
+          wsum  += w;
           contribs[k] = { w, s, ws: w * s };
           weightsUsed[k] = w;
         }
+        const norm = wsum ? score / wsum : 0;
+        const similarityPct = Math.round(Math.max(0, Math.min(1, norm)) * 10000) / 100;
 
-        const norm = wsum ? (score / wsum) : 0;         // 0..1
-        const normClamped = Math.min(1, Math.max(0, norm));
-        const similarityPct = Math.round(normClamped * 10000) / 100; // ไม่มี boost เพื่อความเรียบง่าย/สอดคล้อง CBR.py
-
-
-        // --- แพ็ก debug object (แนบเฉพาะเมื่อเปิด debug) ---
         const dbg = wantDebug ? {
           user_input: {
             interestd_raw: interestd,
             interestd_tokens: userInterestTokens,
-            groupwork, solowork, exam, instruction, attendance,
-            present, experience, challenge, time,
-            // แสดงการ parse โค้ด:
-            parsed: { exam: uExam, instruction: uInstr }
+            instruction_tokens: userInstrTokens,   // ✅ debug token
+            groupwork, solowork, exam, attendance, present, experience, challenge, time,
           },
           case_values: {
             subject_ID: r.subject_ID,
             group_type: r.group_type,
             interestd_raw: r.interestd,
             interestd_tokens: caseInterestTokens,
+            instruction_csv: r.instruction_csv,    // ✅ debug csv
+            instruction_tokens: caseInstrTokens,   // ✅ debug token
             groupwork_ID: r.groupwork_ID,
             solowork_ID: r.solowork_ID,
             exam_ID: r.exam_ID,
-            instruction_ID: r.instruction_ID,
             attendance_ID: r.attendance_ID,
             present_ID: r.present_ID,
             experience_ID: r.experience_ID,
             challenge_ID: r.challenge_ID,
             time_ID: r.time_ID,
-            parsed: { exam: cExam, instruction: cInstr }
           },
-          sims,                 // 0..1 หรือ null
-          weights_used: weightsUsed,
+          sims, weights_used: weightsUsed,
           contributions: Object.fromEntries(
-            Object.entries(contribs).map(([k, v]) => [
-              k,
-              {
-                w: +v.w.toFixed(6),
-                s: +v.s.toFixed(6),
-                ws: +v.ws.toFixed(6),
-                // สัดส่วนต่อคะแนนรวม (คิดเฉพาะมิติที่ active)
-                ws_pct: wsum ? +((v.ws / wsum) * 100).toFixed(3) : 0
-              }
-            ])
+            Object.entries(contribs).map(([k, v]) => [k, {
+              w: +v.w.toFixed(6),
+              s: +v.s.toFixed(6),
+              ws: +v.ws.toFixed(6),
+              ws_pct: wsum ? +((v.ws / wsum) * 100).toFixed(3) : 0
+            }])
           ),
-          sums: {
-            score: +score.toFixed(6),
-            wsum: +wsum.toFixed(6),
-            norm: +norm.toFixed(6),
-            similarityPct
-          }
+          sums: { score: +score.toFixed(6), wsum: +wsum.toFixed(6), norm: +norm.toFixed(6), similarityPct }
         } : undefined;
-
-        // (ทางเลือก) log ออกคอนโซลเมื่อ DEBUG_CBR=1
-        if (wantDebug) {
-          const active = Object.keys(contribs).map(k => ({
-            k, w: contribs[k].w, s: contribs[k].s, ws: +contribs[k].ws.toFixed(6)
-          }));
-          console.log('—— CBR DEBUG —— subject', r.subject_ID);
-          console.log('W used =', weightsUsed);
-          console.log('active dims =', active);
-          console.log('sumW =', +wsum.toFixed(6), 'score =', +score.toFixed(6), 'norm =', +norm.toFixed(6));
-        }
-
 
         return {
           subject_ID: r.subject_ID,
@@ -746,31 +726,34 @@ app.post('/cbr-match', (req, res) => {
           sims,
           grade_ID: r.grade_ID ?? null,
           grade_Name: r.grade_Name ?? null,
-          ...(wantDebug ? { dbg } : {})   // <<— ส่งชุดดีบักกลับไป
+          ...(wantDebug ? { dbg } : {})
         };
       });
 
-      // เรียงคะแนน
+      // เรียง/จัดกลุ่ม (เหมือนของเดิม)
       results.sort((a, b) => b.similarity - a.similarity);
 
-      // ตอบแบบ “แยกกลุ่ม” (Top 3/กลุ่ม) ถ้าผู้ใช้เลือก group_types
-      const wantGroups = Array.isArray(group_types) && group_types.length > 0;
-      if (wantGroups) {
-        const groupsMap = {};
-        for (const item of results) {
-          const key = String(item.group_type);
-          (groupsMap[key] ||= { group_type: key, group_type_name: item.group_type_name || key, items: [] }).items.push(item);
+      if (Array.isArray(group_types) && group_types.length) {
+        const byGroup = {};
+        for (const it of results) {
+          (byGroup[it.group_type] ||= { group_type: it.group_type, group_type_name: it.group_type_name, items: [] }).items.push(it);
         }
-
-        const groups = Object.values(groupsMap).map(g => {
-          const unique = dedupeBySubjectKeepBest(g.items);
-          g.items = unique.slice(0, 3);
+        const groups = Object.values(byGroup).map(g => {
+          // เก็บตัวที่ดีที่สุดต่อ subject_ID
+          const seen = new Set();
+          const out = [];
+          for (const x of g.items) {
+            const key = String(x.subject_ID);
+            if (seen.has(key)) continue;
+            seen.add(key);
+            out.push(x);
+          }
+          g.items = out.slice(0, 3);
           return g;
         });
-
         return res.json({ ok: true, groups });
       }
-      // ไม่ได้ส่ง group_types → ส่งแบบรวม
+
       return res.json({ ok: true, top: results.slice(0, 3), all: results });
 
     } catch (e) {
@@ -778,14 +761,6 @@ app.post('/cbr-match', (req, res) => {
       return res.status(500).json({ ok: false, message: 'CBR compute error' });
     }
   });
-
-  // ---- utils ----
-  function normalizeWeights(w) {
-    const sum = Object.values(w).reduce((a, b) => a + b, 0) || 1;
-    const out = {};
-    for (const k in w) out[k] = w[k] / sum;
-    return out;
-  }
 });
 
 
