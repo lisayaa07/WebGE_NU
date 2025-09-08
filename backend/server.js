@@ -2,9 +2,10 @@ const connection = require("./db");
 const cors = require("cors");
 const path = require("path");
 const express = require("express");
+const pool = require('./db');  
+
 
 require('dotenv').config();
-
 
 
 const app = express();
@@ -18,6 +19,15 @@ app.use((req, res, next) => {
   next();
 });
 
+app.get('/db-health', async (_req, res) => {
+  try {
+    const [r] = await pool.query('SELECT 1');
+    res.json({ ok: true, r });
+  } catch (e) {
+    console.error('DB health fail:', e);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
 
 
 
@@ -199,7 +209,8 @@ app.get("/time", (req, res) => {
 // import mysql from 'mysql2/promise';
 // const pool = mysql.createPool({ ... });
 
-app.post('/submit-form', async (req, res) => {
+app.post("/submit-form", (req, res) => {
+  console.log("📦 ฟอร์มที่รับมา:", req.body);
   const {
     student_id,
     subjectGroup,
@@ -207,104 +218,83 @@ app.post('/submit-form', async (req, res) => {
     faculty,
     interestd,
     subject,
-    groupwork, solowork, exam, attendance,
-    instructions,          // array ได้
-    instruction,           // เดี่ยว/CSV ก็ได้ (แบ็กอัป)
-    present, experience, challenge, time,
-    grade, review
+    groupwork,
+    solowork,
+    exam,
+    attendance,
+    instruction,
+    present,
+    experience,
+    challenge,
+    time,
+    grade,
+    review
   } = req.body;
 
-  const asArray = (v) => Array.isArray(v) ? v : (v == null ? [] : [v]);
-  const normalizeSubject = (v) => {
-    const d = String(v ?? '').trim().replace(/\D/g, '');
-    return d ? d.padStart(6, '0') : null;
-  };
-  const groupType = String(subjectGroup ?? '').toUpperCase(); // คาดหวัง 'G1'|'G2'|'G3'
+  const timestamp = new Date().toISOString().slice(0, 19).replace("T", " ");
 
-  // รวม tokens จาก instructions[] และ/หรือ instruction (CSV/เดี่ยว)
-  const instrTokens = [
-    ...asArray(instructions),
-    ...String(instruction ?? '').split(','),
-  ]
-  .map(x => String(x).trim())
-  .filter(Boolean);
+  const interestds = Array.isArray(interestd) ? interestd.join(",") : interestd;
 
-  const conn = await pool.getConnection();
-  await conn.beginTransaction();
-  try {
-    // --- ตรวจ Subject ---
-    const subjectId = normalizeSubject(subject);
-    if (!subjectId) throw new Error('SUBJECT_REQUIRED');
-    const [[sub]] = await conn.query('SELECT subject_ID FROM Subject WHERE subject_ID=?', [subjectId]);
-    if (!sub) throw new Error(`SUBJECT_NOT_FOUND:${subjectId}`);
+  console.log("❤️ interestd =", interestd);
+  console.log("💡 interestds =", interestds);
 
-    // --- map attendance (ไม่เจอให้เป็น NULL เพื่อไม่ชน FK) ---
-    let attendanceId = (attendance ?? '').toString().trim() || null;
-    if (attendanceId) {
-      const [[am]] = await conn.query('SELECT attendance_ID FROM Attendance_map WHERE attendance_ID=?', [attendanceId]);
-      if (!am) attendanceId = null;
+  const insertFormGe = `
+    INSERT INTO Form_ge (student_ID, faculty_ID, student_level, interestd, timestamp)
+    VALUES (?, ?, ?, ?, ?)
+
+  `;
+
+  connection.query(insertFormGe, [student_id, faculty, student_level, interestds, timestamp], (err, result) => {
+    if (err) {
+      console.error("Insert Form_ge error:", err);
+      return res.status(500).send("Insert Form_ge failed");
     }
 
-    // --- Insert Form_ge ---
-    const interestCsv = asArray(interestd).filter(Boolean).join(',');
-    const facultyCode = (faculty && String(faculty).trim()) || 'F9';
-    const [geRes] = await conn.execute(
-      `INSERT INTO Form_ge (student_ID, faculty_ID, student_level, interestd, timestamp)
-       VALUES (?, ?, ?, ?, NOW())`,
-      [student_id || null, facultyCode, Number(student_level) || null, interestCsv || null]
-    );
-    const fgId = geRes.insertId;
+    const formGeId = result.insertId;
 
-    // --- Insert Form_review (ปล่อย instruction_ID เป็น NULL ก่อน) ---
-    const [frRes] = await conn.execute(
-      `INSERT INTO Form_review (
-         fg_ID, group_type, subject_ID, grade_ID, review,
-         groupwork_ID, solowork_ID, exam_ID, attendance_ID,
-         instruction_ID, present_ID, experience_ID, challenge_ID, time_ID
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?)`,
-      [
-        fgId, groupType, subjectId, grade ?? null, review ?? null,
-        groupwork ?? null, solowork ?? null, exam ?? null, attendanceId,
-        present ?? null, experience ?? null, challenge ?? null, time ?? null
-      ]
-    );
-    const frId = frRes.insertId;
+    const insertReview = `
+      INSERT INTO Form_review (
+        fg_ID,
+        group_type,
+        subject_ID,
+        groupwork_ID,
+        solowork_ID,
+        exam_ID,
+        attendance_ID,
+        instruction_ID,
+        present_ID,
+        experience_ID,
+        challenge_ID,
+        time_ID,
+        grade_ID,
+        review
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
 
-    // --- Insert หลายค่าไปตารางเชื่อม (validate กับ Instruction_map) ---
-    let csvForDisplay = '';
-    if (instrTokens.length) {
-      const [rows] = await conn.query(
-        `SELECT instruction_ID FROM Instruction_map WHERE instruction_ID IN (?);`,
-        [instrTokens]
-      );
-      const valid = [...new Set(rows.map(r => r.instruction_ID))];
-      if (valid.length) {
-        const values = valid.map(code => [frId, code]);
-        await conn.query(
-          `INSERT IGNORE INTO Form_review_instruction (fr_ID, instruction_ID) VALUES ?`,
-          [values]
-        );
-        csvForDisplay = valid.join(','); // ใช้โชว์/ค้นในบาง endpoint ได้
+    connection.query(insertReview, [
+      formGeId,
+      subjectGroup,
+      subject,
+      groupwork,
+      solowork,
+      exam,
+      attendance,
+      instruction,
+      present,
+      experience,
+      challenge,
+      time,
+      grade,
+      review
+    ], (err2) => {
+      if (err2) {
+        console.error("Insert Form_review error:", err2);
+        return res.status(500).send("Insert Form_review failed");
       }
-    }
 
-    // --- (ออปชันแนะนำ) ซิงก์ค่า CSV กลับไปคอลัมน์ Form_review.instruction_ID เพื่อไม่ให้เป็น NULL ---
-    await conn.execute(
-      `UPDATE Form_review SET instruction_ID = ? WHERE fr_ID = ?`,
-      [csvForDisplay, frId]
-    );
-
-    await conn.commit();
-    res.status(201).json({ ok: true, fr_ID: frId });
-  } catch (e) {
-    await conn.rollback();
-    console.error('submit-form error:', e);
-    const msg = String(e.message || e);
-    if (msg.startsWith('SUBJECT_')) return res.status(400).json({ ok:false, error: msg });
-    res.status(500).json({ ok:false, error: 'SERVER_ERROR' });
-  } finally {
-    conn.release();
-  }
+      res.send("✅ ข้อมูลถูกบันทึกเรียบร้อยแล้ว");
+    });
+  });
 });
 
 
