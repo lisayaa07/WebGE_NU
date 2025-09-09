@@ -2,17 +2,22 @@ const connection = require("./db");
 const cors = require("cors");
 const path = require("path");
 const express = require("express");
-const pool = require('./db');  
+const db = connection.promise();
 
 
+// server.js (ส่วนบน)
 require('dotenv').config();
+
+
+
 
 
 const app = express();
 app.use(cors());
-app.use(express.static("public"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+
 
 app.use((req, res, next) => {
   console.log(`📥 Request: ${req.method} ${req.url}`);
@@ -826,7 +831,80 @@ app.get('/subjects/:id/reviews', (req, res) => {
   })
 })
 
+function normalizeSubjectId(x) {
+  return String(x || '').replace(/\s+/g, '').toUpperCase().slice(0, 6);
+}
 
+
+// คืนเฉพาะ subject_ID เพื่อไฮไลต์หัวใจ
+// คืน subject_ID ทั้งหมดที่คนนั้นกดหัวใจ
+app.get('/favorites/ids', async (req, res) => {
+  try {
+    const studentId = String(req.query.student_id || '').trim();
+    if (!studentId) return res.status(400).json({ ok:false, message:'student_id required' });
+
+    const [rows] = await db.query(
+      'SELECT subject_ID FROM Favorite WHERE student_ID = ?',
+      [studentId]
+    );
+    res.json(rows.map(r => r.subject_ID));
+  } catch (e) {
+    console.error('favorites ids error:', e);
+    res.status(500).json({ ok:false, message:'Database error' });
+  }
+});
+
+// เพิ่มรายการโปรด — ไม่ต้องส่ง group_type (trigger DB จะเติมให้เอง)
+app.post('/favorites', async (req, res) => {
+  try {
+    let { student_id, subject_id } = req.body || {};
+    if (!student_id || !subject_id) {
+      return res.status(400).json({ ok:false, message:'student_id and subject_id required' });
+    }
+    const sid = normalizeSubjectId(subject_id);
+
+    // ดึง group_type ของวิชานั้น
+    const [[row]] = await db.query(
+      'SELECT Group_Type_ID AS gt FROM Subject WHERE subject_ID = ? LIMIT 1',
+      [sid]
+    );
+    if (!row || !row.gt) {
+      return res.status(400).json({ ok:false, message:'subject not found or no group type' });
+    }
+
+    await db.query(
+      `INSERT INTO Favorite (student_ID, subject_ID, group_type)
+       VALUES (?, ?, ?)
+       ON DUPLICATE KEY UPDATE created_at = CURRENT_TIMESTAMP`,
+      [student_id, sid, row.gt]
+    );
+
+    res.json({ ok:true });
+  } catch (e) {
+    console.error('favorite add error:', e);
+    res.status(500).json({ ok:false, message:'Database error' });
+  }
+});
+
+
+// เอาออกจากรายการโปรด
+app.delete('/favorites', async (req, res) => {
+  try {
+    const studentId = String(req.query.student_id || '').trim();
+    const subjectId = normalizeSubjectId(req.query.subject_id);
+    if (!studentId || !subjectId) {
+      return res.status(400).json({ ok:false, message:'student_id and subject_id required' });
+    }
+    await db.query(
+      'DELETE FROM Favorite WHERE student_ID = ? AND subject_ID = ?',
+      [studentId, subjectId]
+    );
+    res.json({ ok:true });
+  } catch (e) {
+    console.error('favorite delete error:', e);
+    res.status(500).json({ ok:false, message:'Database error' });
+  }
+});
 
 
 
