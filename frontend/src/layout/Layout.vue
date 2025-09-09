@@ -92,7 +92,14 @@ function logout() {
             </div>
             <div class="flex items-center gap-3">
                 <div class="btn btn-ghost btn-circle">
-                    <FontAwesomeIcon icon="heart-circle-check" size="2xl" class="text-red-500" />
+                   <router-link
+                    :to="{ name: 'favorites' }"
+                    class="inline-flex items-center p-2 rounded-md hover:bg-base-200"
+                    aria-label="ไปหน้ารายการโปรด"
+                    title="รายการโปรด"
+                    >
+                    <FontAwesomeIcon icon="heart-circle-check" size="2xl" class="text-red-500 cursor-pointer" />
+                    </router-link>
                 </div>
                 <div class="avatar">
                     <div class="w-12 rounded-full">

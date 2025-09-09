@@ -9,6 +9,7 @@ import ReviewSubjectsView from '@/views/ReviewSubjectsView.vue'
 import PopularSubjectsView from '@/views/PopularSubjectsView.vue'
 import Login from '@/views/Login.vue'
 import SignupView from '@/views/Signup.vue'
+import FavoritesView from '@/views/FavoritesView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -64,6 +65,12 @@ const router = createRouter({
     },
     { path: '/Login', 
       redirect: '/login' 
+    },
+    {
+      path: '/favorites',
+      name: 'favorites',
+      component: FavoritesView,
+      meta: { requiresAuth: true }
     },
   ],
 })

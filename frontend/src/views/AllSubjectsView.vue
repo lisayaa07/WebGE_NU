@@ -1,35 +1,99 @@
 <script setup>
 import Layout from '@/layout/Layout.vue'
-
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'     
+import { ref, onMounted, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import axios from 'axios'
 
-const router = useRouter()                 
+import { library } from '@fortawesome/fontawesome-svg-core'
+import { faHeart as farHeart } from '@fortawesome/free-regular-svg-icons'
+import { faHeart as fasHeart } from '@fortawesome/free-solid-svg-icons'
+library.add(farHeart, fasHeart)
+
+
+
+
+const router = useRouter()
 const groupedSubjects = ref([])
 
-onMounted(async () => {
-    try {
-        const res = await axios.get('http://localhost:3000/grouped-subjects')
-        groupedSubjects.value = res.data
-    } catch (err) {
-        console.error('❌ โหลด grouped subjects ล้มเหลว', err)
+// ✅ อ่านค่าจาก localStorage แบบที่โปรเจ็กต์คุณใช้อยู่แล้ว
+const studentId = ref(localStorage.getItem('student_ID') || '')
+const isLoggedIn = computed(() => localStorage.getItem('auth') === '1' && !!studentId.value)
+
+// ✅ รายการโปรด (subject_ID เป็นชุด)
+const favoriteIds = ref(new Set())
+const isFav = (subjectId) => favoriteIds.value.has(String(subjectId).trim())
+
+const API = 'http://localhost:3000' // เปลี่ยนเป็น base ของคุณถ้าใช้ instance อื่น
+
+async function fetchFavorites () {
+  if (!isLoggedIn.value) return
+  try {
+    const { data } = await axios.get(`${API}/favorites/ids`, {
+      params: { student_id: studentId.value }
+    })
+    favoriteIds.value = new Set((data || []).map(String))
+  } catch (err) {
+    console.error('❌ โหลด favorites ล้มเหลว', err)
+  }
+}
+
+async function toggleFavorite (subjectId) {
+  if (!isLoggedIn.value) {
+    alert('กรุณาเข้าสู่ระบบก่อนจึงจะใช้งานรายการโปรดได้')
+    return
+  }
+  const sid = String(subjectId).trim()
+  const wasFav = favoriteIds.value.has(sid)
+
+  // optimistic update (ต้องสร้าง Set ใหม่ให้ reactive)
+  const next = new Set(favoriteIds.value)
+  wasFav ? next.delete(sid) : next.add(sid)
+  favoriteIds.value = next
+
+  try {
+    if (wasFav) {
+      await axios.delete(`${API}/favorites`, {
+        params: { student_id: studentId.value, subject_id: sid }
+      })
+    } else {
+      // ไม่ต้องส่ง group_type — trigger ใน DB จะเติมให้เอง
+      await axios.post(`${API}/favorites`, {
+        student_id: studentId.value,
+        subject_id: sid
+      })
     }
+  } catch (err) {
+    console.error('❌ toggle favorite error', err)
+    // rollback
+    const rollback = new Set(favoriteIds.value)
+    wasFav ? rollback.add(sid) : rollback.delete(sid)
+    favoriteIds.value = rollback
+    alert('ไม่สามารถอัปเดตรายการโปรดได้ กรุณาลองใหม่')
+  }
+}
+
+// โหลดข้อมูลหน้ารวมวิชา + รายการโปรด
+onMounted(async () => {
+  try {
+    const res = await axios.get(`${API}/grouped-subjects`)
+    groupedSubjects.value = res.data
+  } catch (err) {
+    console.error('❌ โหลด grouped subjects ล้มเหลว', err)
+  }
+  await fetchFavorites()
 })
 
-//พาไปหน้ารีวิวของรายวิชาที่กดเข้าไป
-function Comments(subject) {
-    if (!subject?.subject_ID) {
-        console.warn('ไม่มี subject_ID')
-        return
-    }
-    router.push({
-        name: 'reviewsubjects',
-        params: { id: subject.subject_ID },           // ส่งรหัสวิชา
-        query: { name: subject.subject_Name || '' },  // ส่งชื่อ
-    })
+// ไปหน้ารีวิวรายวิชา
+function Comments (subject) {
+  if (!subject?.subject_ID) return
+  router.push({
+    name: 'reviewsubjects',
+    params: { id: subject.subject_ID },
+    query: { name: subject.subject_Name || '' },
+  })
 }
 </script>
+
 
 <template>
     <Layout>
@@ -53,10 +117,26 @@ function Comments(subject) {
                                 <FontAwesomeIcon icon="comment-dots" size="xl" class="text-gray-600" />
                             </button>
 
-                            <!-- ปุ่มหัวใจ (เดิม) -->
-                            <button type="button" class="btn btn-ghost btn-circle" aria-label="ถูกใจ">
-                                <FontAwesomeIcon :icon="['far', 'heart']" size="xl" class="text-red-500" />
+                            <!-- ปุ่มหัวใจ (layered) -->
+                          <button
+                            type="button"
+                            class="btn btn-ghost btn-circle"
+                            :aria-pressed="isFav(subject.subject_ID)"
+                            @click="toggleFavorite(subject.subject_ID)"
+                            :title="isFav(subject.subject_ID) ? 'เอาออกจากรายการโปรด' : 'เพิ่มเป็นรายการโปรด'"
+                            >
+                            <FontAwesomeIcon
+                                :icon="isFav(subject.subject_ID) ? ['fas','heart'] : ['far','heart']"
+                                size="xl"
+                                :class="isFav(subject.subject_ID)
+                                ? 'text-red-500 transition-transform duration-150 scale-110'
+                                : 'text-red-500/40 hover:text-red-500 transition-colors duration-150'"
+                            />
                             </button>
+
+
+
+
                         </div>
                     </div>
                 </div>

@@ -9,6 +9,8 @@ const password = ref('')
 const loading = ref(false)
 const errorMsg = ref('')
 
+
+
 function isNuEmail(v) { return typeof v === 'string' && v.toLowerCase().endsWith('@nu.ac.th') }
 
 const onLogin = async (e) => {
