@@ -906,6 +906,107 @@ app.delete('/favorites', async (req, res) => {
   }
 });
 
+// GET /favorites/grouped?student_id=XXXX
+app.get('/favorites/grouped', async (req, res) => {
+  try {
+    const studentId = String(req.query.student_id || '').trim();
+    if (!studentId) return res.status(400).json({ ok:false, message:'student_id required' });
+
+    // ดึงวิชาโปรดของนิสิต พร้อมชื่อหมวดวิชา
+    const [rows] = await db.query(`
+      SELECT
+        s.Group_Type_ID AS group_ID,
+        gt.GroupType_Name AS group_Name,
+        s.subject_ID,
+        s.subject_Name
+      FROM Favorite f
+      JOIN Subject s        ON s.subject_ID    = f.subject_ID
+      LEFT JOIN Group_Type gt ON gt.GroupType_ID = s.Group_Type_ID
+      WHERE f.student_ID = ?
+      ORDER BY s.Group_Type_ID, s.subject_Name
+    `, [studentId]);
+
+    // จัดกลุ่มให้เป็น [{ group_ID, group_Name, subjects: [{subject_ID, subject_Name}, ...] }, ...]
+    const grouped = [];
+    for (const r of rows) {
+      let g = grouped.find(x => x.group_ID === r.group_ID);
+      if (!g) {
+        g = { group_ID: r.group_ID, group_Name: r.group_Name, subjects: [] };
+        grouped.push(g);
+      }
+      g.subjects.push({ subject_ID: r.subject_ID, subject_Name: r.subject_Name });
+    }
+
+    res.json(grouped);
+  } catch (e) {
+    console.error('favorites grouped error:', e);
+    res.status(500).json({ ok:false, message:'Database error' });
+  }
+});
+
+
+// ✅ Top 3 วิชายอดฮิตของแต่ละกลุ่ม พร้อมรีวิวทั้งหมด
+app.get('/popular-subjects', async (req, res) => {
+  try {
+    const sql = `
+      SELECT 
+        s.Group_Type_ID AS group_ID,
+        gt.GroupType_Name AS group_Name,
+        fr.subject_ID,
+        s.subject_Name,
+        COUNT(fr.fr_ID) AS review_count
+      FROM Form_review fr
+      JOIN Subject s ON s.subject_ID = fr.subject_ID
+      LEFT JOIN Group_Type gt ON gt.GroupType_ID = s.Group_Type_ID
+      GROUP BY s.Group_Type_ID, fr.subject_ID
+      ORDER BY s.Group_Type_ID, review_count DESC
+    `;
+
+    const [rows] = await db.query(sql);
+
+    // ✅ จัดกลุ่ม
+    const grouped = {};
+    for (const r of rows) {
+      if (!grouped[r.group_ID]) {
+        grouped[r.group_ID] = {
+          group_ID: r.group_ID,
+          group_Name: r.group_Name,
+          subjects: []
+        };
+      }
+      grouped[r.group_ID].subjects.push(r);
+    }
+
+    // ✅ เอา top 3 + เพิ่มรีวิวทั้งหมด
+    for (const g of Object.values(grouped)) {
+      g.subjects = await Promise.all(
+        g.subjects
+          .sort((a, b) => b.review_count - a.review_count)
+          .slice(0, 3)
+          .map(async subj => {
+            const [reviews] = await db.query(
+              `SELECT fr_ID AS id, review AS text 
+               FROM Form_review 
+               WHERE subject_ID = ? 
+               ORDER BY fr_ID DESC`,
+              [subj.subject_ID]
+            );
+            return {
+              ...subj,
+              reviews
+            };
+          })
+      );
+    }
+
+    res.json(Object.values(grouped));
+  } catch (e) {
+    console.error('popular-subjects error:', e);
+    res.status(500).json({ message: 'Database error' });
+  }
+});
+
+
 
 
 // ✅ เริ่ม server
