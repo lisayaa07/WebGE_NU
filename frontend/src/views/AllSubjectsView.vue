@@ -23,7 +23,7 @@ const isLoggedIn = computed(() => localStorage.getItem('auth') === '1' && !!stud
 const favoriteIds = ref(new Set())
 const isFav = (subjectId) => favoriteIds.value.has(String(subjectId).trim())
 
-const API = 'http://localhost:3000' // เปลี่ยนเป็น base ของคุณถ้าใช้ instance อื่น
+const API = 'http://localhost:3000' 
 
 async function fetchFavorites () {
   if (!isLoggedIn.value) return
