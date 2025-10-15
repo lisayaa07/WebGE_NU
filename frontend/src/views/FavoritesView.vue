@@ -2,42 +2,60 @@
 import Layout from '@/layout/Layout.vue'
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import axios from 'axios'
 import { library } from '@fortawesome/fontawesome-svg-core'
 import { faHeart as farHeart } from '@fortawesome/free-regular-svg-icons'
 import { faHeart as fasHeart } from '@fortawesome/free-solid-svg-icons'
-library.add(farHeart, fasHeart)
-const router = useRouter()
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 
-// ✅ อ่านข้อมูลจาก localStorage ตามรูปแบบที่คุณเก็บไว้แล้ว
+library.add(farHeart, fasHeart)
+
+// Base API URL (ตั้งใน .env: VITE_API_URL)
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+const router = useRouter()
+
+// อ่านข้อมูลจาก localStorage ตามรูปแบบที่คุณเก็บไว้แล้ว
 const studentId = ref(localStorage.getItem('student_ID') || '')
 const isLoggedIn = computed(() => localStorage.getItem('auth') === '1' && !!studentId.value)
 
-// ✅ state สำหรับเพจรายการโปรด
+// state สำหรับเพจรายการโปรด
 const groupedFavs = ref([])  // [{ group_ID, group_Name, subjects: [{subject_ID, subject_Name}] }]
 const loading = ref(false)
 const errorMsg = ref('')
 
+// helper: headers (ใส่ Authorization ถ้ามี token)
+function authHeaders() {
+  const headers = { 'Content-Type': 'application/json' }
+  const token = localStorage.getItem('token')
+  if (token) headers.Authorization = `Bearer ${token}`
+  return headers
+}
+
 // โหลดรายการโปรด (จัดกลุ่ม)
-async function loadFavorites() {
-  if (!studentId) return
+async function fetchFavoritesGrouped() {
+  if (!isLoggedIn.value) return
   loading.value = true
+  errorMsg.value = ''
   try {
-    const res = await fetch(`${API_URL}/favorites/grouped?student_id=${encodeURIComponent(studentId)}`, {
+    const url = `${API_URL}/favorites/grouped?student_id=${encodeURIComponent(studentId.value)}`
+    const res = await fetch(url, {
       method: 'GET',
-      headers: { 'Content-Type': 'application/json' }
+      headers: authHeaders()
     })
-    if (!res.ok) throw new Error((await res.json()).message || res.statusText)
-    favorites.value = await res.json()
+    if (!res.ok) {
+      let msg = res.statusText
+      try { const j = await res.json(); msg = j?.message || msg } catch (e) {}
+      throw new Error(msg)
+    }
+    const data = await res.json()
+    groupedFavs.value = Array.isArray(data) ? data : []
   } catch (e) {
-    error.value = e.message || 'ไม่สามารถโหลดรายการโปรดได้'
+    console.error('❌ โหลด favorites grouped ล้มเหลว', e)
+    errorMsg.value = e.message || 'โหลดรายการโปรดไม่สำเร็จ'
   } finally {
     loading.value = false
   }
 }
 
-// (ตัวเลือก) กดหัวใจลบออกจากรายการโปรด แล้วอัปเดต UI ทันที
+// (ตัวเลือก) กดหัวใจลบออกจากรายการโปรด แล้วอัปเดต UI ทันที (optimistic update)
 async function removeFavorite(subjectId) {
   if (!isLoggedIn.value) {
     alert('กรุณาเข้าสู่ระบบก่อนจึงจะใช้งานรายการโปรดได้')
@@ -45,19 +63,27 @@ async function removeFavorite(subjectId) {
   }
   const sid = String(subjectId).trim()
 
-  // optimistic update: ลบออกจาก state ทันที
+  // เก็บ snapshot เพื่อ rollback หากล้มเหลว
   const snapshot = JSON.parse(JSON.stringify(groupedFavs.value))
+
   try {
+    // optimistic update: ลบจาก state ทันที
     for (const g of groupedFavs.value) {
       g.subjects = g.subjects.filter(s => String(s.subject_ID) !== sid)
     }
-    // ลบกลุ่มที่ไม่มีวิชาแล้ว
     groupedFavs.value = groupedFavs.value.filter(g => g.subjects.length > 0)
 
     // call API ลบจริง
-    await axios.delete(`${API}/favorites`, {
-      params: { student_id: studentId.value, subject_id: sid }
+    const url = `${API_URL}/favorites?student_id=${encodeURIComponent(studentId.value)}&subject_id=${encodeURIComponent(sid)}`
+    const res = await fetch(url, {
+      method: 'DELETE',
+      headers: authHeaders()
     })
+    if (!res.ok) {
+      let msg = res.statusText
+      try { const j = await res.json(); msg = j?.message || msg } catch(e){}
+      throw new Error(msg)
+    }
   } catch (e) {
     console.error('❌ remove favorite error', e)
     // rollback
@@ -87,7 +113,7 @@ onMounted(async () => {
     <div class="p-6">
       <h1 class="text-2xl font-semibold mb-4">รายการโปรดของฉัน</h1>
 
-      <!-- ไม่ได้ล็อกอิน -->
+      <!-- ยังไม่ได้ล็อกอิน -->
       <div v-if="!isLoggedIn" class="text-gray-600">
         กรุณาเข้าสู่ระบบเพื่อดูรายการโปรด
       </div>
