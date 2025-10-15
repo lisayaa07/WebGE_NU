@@ -32,6 +32,7 @@ const onLogin = async (e) => {
 
       // ⬇️ เก็บ user profile ลง localStorage
     // หลัง login สำเร็จ
+    localStorage.setItem('token', data.token)
     localStorage.setItem('auth', '1')
     localStorage.setItem('userEmail', data.user.id)
     localStorage.setItem('student_ID', data.user.student_ID || '')

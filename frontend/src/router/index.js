@@ -63,12 +63,7 @@ const router = createRouter({
       name: 'signup', 
       component: SignupView 
     },
-    { path: '/Login.vue', 
-      redirect: '/login' 
-    },
-    { path: '/Login', 
-      redirect: '/login' 
-    },
+
     {
       path: '/favorites',
       name: 'favorites',
