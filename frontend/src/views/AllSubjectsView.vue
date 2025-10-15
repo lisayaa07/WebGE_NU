@@ -78,25 +78,30 @@ function Comments(subject) {
 }
 </script>
 
+
 <template>
     <Layout>
-        <div class="bg-[#6495ED]/35 shadow p-6 rounded-3xl mt-10 mx-3">
-            <h1 class="text-3xl font-bold text-black/70">รายวิชาทั้งหมด</h1>
-            <div v-for="group in groupedSubjects" :key="group.group_ID" class="mt-5">
-                <p class="text-2xl ml-15 mb-2">{{ group.group_Name }}</p>
-                <div v-for="subject in group.subjects" :key="subject.subject_ID"
-                    class="ml-15 bg-white shadow-md rounded-lg p-4 my-2 flex justify-between items-center">
-                    <div class="flex-grow">
-                        <p class="text-xl font-medium text-black">
+        <p class="text-3xl m-4 mb-5">หมวดวิชาศึกษาทั่วไป</p>
+
+        <div v-for="group in groupedSubjects" :key="group.group_ID" class="ml-20">
+            <p class="text-xl mb-2.5">{{ group.group_Name }}</p>
+
+            <div class="ml-25">
+                <div>
+                    <div v-for="subject in group.subjects" :key="subject.subject_ID"
+                        class="flex justify-between items-center">
+                        <span>
                             {{ subject.subject_ID }} {{ subject.subject_Name }}
-                        </p>
-                    </div>
-                    <div class="flex items-center space-x-2">
-                        <div class="flex items-center gap-2 pr-4">
+                        </span>
+
+                        <div class="flex pr-20 gap-6">
+                            <!-- ✅ ทำให้ปุ่มคอมเมนต์คลิกได้จริง และไม่ไป submit ฟอร์ม -->
                             <button type="button" class="btn btn-ghost btn-circle" @click="Comments(subject)"
                                 aria-label="ดูคอมเมนต์ของวิชานี้" title="ดูคอมเมนต์">
                                 <FontAwesomeIcon icon="comment-dots" size="xl" class="text-gray-600" />
                             </button>
+
+                            <!-- ปุ่มหัวใจ (layered) -->
                           <button
                             type="button"
                             class="btn btn-ghost btn-circle"
