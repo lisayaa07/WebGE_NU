@@ -8,7 +8,7 @@ import { faHeart as farHeart } from '@fortawesome/free-regular-svg-icons'
 import { faHeart as fasHeart } from '@fortawesome/free-solid-svg-icons'
 library.add(farHeart, fasHeart)
 const router = useRouter()
-const API = 'http://localhost:3000' // เปลี่ยนเป็น base URL ของคุณได้
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 
 // ✅ อ่านข้อมูลจาก localStorage ตามรูปแบบที่คุณเก็บไว้แล้ว
 const studentId = ref(localStorage.getItem('student_ID') || '')
@@ -20,18 +20,18 @@ const loading = ref(false)
 const errorMsg = ref('')
 
 // โหลดรายการโปรด (จัดกลุ่ม)
-async function fetchFavoritesGrouped() {
-  if (!isLoggedIn.value) return
+async function loadFavorites() {
+  if (!studentId) return
   loading.value = true
-  errorMsg.value = ''
   try {
-    const { data } = await axios.get(`${API}/favorites/grouped`, {
-      params: { student_id: studentId.value }
+    const res = await fetch(`${API_URL}/favorites/grouped?student_id=${encodeURIComponent(studentId)}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' }
     })
-    groupedFavs.value = Array.isArray(data) ? data : []
+    if (!res.ok) throw new Error((await res.json()).message || res.statusText)
+    favorites.value = await res.json()
   } catch (e) {
-    console.error('❌ โหลด favorites grouped ล้มเหลว', e)
-    errorMsg.value = 'โหลดรายการโปรดไม่สำเร็จ'
+    error.value = e.message || 'ไม่สามารถโหลดรายการโปรดได้'
   } finally {
     loading.value = false
   }
