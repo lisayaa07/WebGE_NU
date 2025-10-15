@@ -7,85 +7,68 @@ import axios from 'axios'
 import { library } from '@fortawesome/fontawesome-svg-core'
 import { faHeart as farHeart } from '@fortawesome/free-regular-svg-icons'
 import { faHeart as fasHeart } from '@fortawesome/free-solid-svg-icons'
-
 library.add(farHeart, fasHeart)
 
-
-
+// --- START: EDIT ---
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+// --- END: EDIT ---
 
 const router = useRouter()
 const groupedSubjects = ref([])
-
-// ✅ อ่านค่าจาก localStorage แบบที่โปรเจ็กต์คุณใช้อยู่แล้ว
 const studentId = ref(localStorage.getItem('student_ID') || '')
 const isLoggedIn = computed(() => localStorage.getItem('auth') === '1' && !!studentId.value)
-
-// ✅ รายการโปรด (subject_ID เป็นชุด)
 const favoriteIds = ref(new Set())
 const isFav = (subjectId) => favoriteIds.value.has(String(subjectId).trim())
-
-const API = 'http://localhost:3000' 
 
 async function fetchFavorites () {
   if (!isLoggedIn.value) return
   try {
-    const { data } = await axios.get(`${API}/favorites/ids`, {
+    const { data } = await axios.get(`${API_URL}/favorites/ids`, { // <-- EDIT
       params: { student_id: studentId.value }
     })
     favoriteIds.value = new Set((data || []).map(String))
   } catch (err) {
-    console.error('❌ โหลด favorites ล้มเหลว', err)
+    console.error('❌ โหลดรายการโปรดล้มเหลว', err)
   }
 }
 
-async function toggleFavorite (subjectId) {
+const toggleFavorite = async (subjectId) => {
   if (!isLoggedIn.value) {
-    alert('กรุณาเข้าสู่ระบบก่อนจึงจะใช้งานรายการโปรดได้')
+    router.push({ name: 'login' })
     return
   }
-  const sid = String(subjectId).trim()
-  const wasFav = favoriteIds.value.has(sid)
-
-  // optimistic update (ต้องสร้าง Set ใหม่ให้ reactive)
-  const next = new Set(favoriteIds.value)
-  wasFav ? next.delete(sid) : next.add(sid)
-  favoriteIds.value = next
+  const stringId = String(subjectId).trim()
+  const isCurrentlyFav = isFav(stringId)
 
   try {
-    if (wasFav) {
-      await axios.delete(`${API}/favorites`, {
-        params: { student_id: studentId.value, subject_id: sid }
+    if (isCurrentlyFav) {
+      await axios.delete(`${API_URL}/favorites`, { // <-- EDIT
+        data: { student_id: studentId.value, subject_id: stringId }
       })
+      favoriteIds.value.delete(stringId)
     } else {
-      // ไม่ต้องส่ง group_type — trigger ใน DB จะเติมให้เอง
-      await axios.post(`${API}/favorites`, {
+      await axios.post(`${API_URL}/favorites`, { // <-- EDIT
         student_id: studentId.value,
-        subject_id: sid
+        subject_id: stringId
       })
+      favoriteIds.value.add(stringId)
     }
   } catch (err) {
-    console.error('❌ toggle favorite error', err)
-    // rollback
-    const rollback = new Set(favoriteIds.value)
-    wasFav ? rollback.add(sid) : rollback.delete(sid)
-    favoriteIds.value = rollback
-    alert('ไม่สามารถอัปเดตรายการโปรดได้ กรุณาลองใหม่')
+    console.error('❌ อัปเดตรายการโปรดล้มเหลว', err)
   }
 }
 
-// โหลดข้อมูลหน้ารวมวิชา + รายการโปรด
 onMounted(async () => {
   try {
-    const res = await axios.get(`${API}/grouped-subjects`)
+    const res = await axios.get(`${API_URL}/subjects-grouped`) // <-- EDIT
     groupedSubjects.value = res.data
+    await fetchFavorites()
   } catch (err) {
-    console.error('❌ โหลด grouped subjects ล้มเหลว', err)
+    console.error('❌ โหลดวิชาล้มเหลว', err)
   }
-  await fetchFavorites()
 })
 
-// ไปหน้ารีวิวรายวิชา
-function Comments (subject) {
+function Comments(subject) {
   if (!subject?.subject_ID) return
   router.push({
     name: 'reviewsubjects',
@@ -95,30 +78,25 @@ function Comments (subject) {
 }
 </script>
 
-
 <template>
     <Layout>
-        <p class="text-3xl m-4 mb-5">หมวดวิชาศึกษาทั่วไป</p>
-
-        <div v-for="group in groupedSubjects" :key="group.group_ID" class="ml-20">
-            <p class="text-xl mb-2.5">{{ group.group_Name }}</p>
-
-            <div class="ml-25">
-                <div>
-                    <div v-for="subject in group.subjects" :key="subject.subject_ID"
-                        class="flex justify-between items-center">
-                        <span>
+        <div class="bg-[#6495ED]/35 shadow p-6 rounded-3xl mt-10 mx-3">
+            <h1 class="text-3xl font-bold text-black/70">รายวิชาทั้งหมด</h1>
+            <div v-for="group in groupedSubjects" :key="group.group_ID" class="mt-5">
+                <p class="text-2xl ml-15 mb-2">{{ group.group_Name }}</p>
+                <div v-for="subject in group.subjects" :key="subject.subject_ID"
+                    class="ml-15 bg-white shadow-md rounded-lg p-4 my-2 flex justify-between items-center">
+                    <div class="flex-grow">
+                        <p class="text-xl font-medium text-black">
                             {{ subject.subject_ID }} {{ subject.subject_Name }}
-                        </span>
-
-                        <div class="flex pr-20 gap-6">
-                            <!-- ✅ ทำให้ปุ่มคอมเมนต์คลิกได้จริง และไม่ไป submit ฟอร์ม -->
+                        </p>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <div class="flex items-center gap-2 pr-4">
                             <button type="button" class="btn btn-ghost btn-circle" @click="Comments(subject)"
                                 aria-label="ดูคอมเมนต์ของวิชานี้" title="ดูคอมเมนต์">
                                 <FontAwesomeIcon icon="comment-dots" size="xl" class="text-gray-600" />
                             </button>
-
-                            <!-- ปุ่มหัวใจ (layered) -->
                           <button
                             type="button"
                             class="btn btn-ghost btn-circle"
