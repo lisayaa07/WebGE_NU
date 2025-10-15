@@ -21,4 +21,5 @@ const pool = new Pool({
   ssl: sslConfig, // ← นำ object ที่ตั้งค่าแล้วมาใช้ตรงนี้
 });
 
+
 module.exports = pool;
