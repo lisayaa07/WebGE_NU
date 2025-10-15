@@ -1,8 +1,11 @@
-const connection = require("./db");
+
 const cors = require("cors");
 const path = require("path");
 const express = require("express");
 const db = connection.promise();
+const connection = require("./db");  
+
+
 
 
 
@@ -14,7 +17,6 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
 
 
 
