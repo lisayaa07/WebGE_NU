@@ -1,7 +1,18 @@
-const mysql = require("mysql2");
-const fs = require("fs");
-const { Pool } = require('pg');
-require("dotenv").config(); // โหลดค่าจาก .env
+// ✅ ใช้ mysql2 ไม่ใช่ mysql
+const mysql = require('mysql2');
+
+// ✅ สร้าง connection
+const connection = mysql.createConnection({
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
+  port: process.env.DB_PORT,
+  ssl: { rejectUnauthorized: true }
+});
+
+// ✅ export ออกไปให้ server.js ใช้งาน
+module.exports = connection;
 
 const sslConfig = {
   rejectUnauthorized: true,
