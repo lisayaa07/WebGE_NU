@@ -3,7 +3,7 @@ import { ref, onMounted, computed } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import profile from '/Photo/profilee.jpg'
 import axios from 'axios'
-
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 const router = useRouter()
 const route = useRoute()
 const sidebarOpen = ref(false)
@@ -43,13 +43,23 @@ onMounted(async () => {
     })
 
     // โหลดรายชื่อคณะ (ID → Name)
-    try {
-        const res = await fetch('http://localhost:3000/faculty')
-        faculties.value = await res.json()
-    } catch (e) {
-        console.error('โหลดคณะไม่สำเร็จ:', e)
-        faculties.value = []
+     try {
+    const res = await fetch(`${API_URL}/faculty`, {
+      method: 'GET',
+      headers: authHeaders()
+    })
+
+    // อ่าน body แบบปลอดภัย
+    const j = await res.json().catch(() => null)
+
+    if (!res.ok) {
+      // ถ้า backend ส่งข้อความผิดพลาดเป็น JSON ให้ใช้ ถ้าไม่มีก็ใช้ statusText
+      throw new Error(j?.message || res.statusText || 'โหลดคณะไม่สำเร็จ')
     }
+} catch (e) {
+    console.error(e)
+    // ไม่ต้องแสดงข้อความผิดพลาดใน UI
+  }
 })
 
 const currentFacultyId = computed(() =>
