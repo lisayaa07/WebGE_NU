@@ -1,18 +1,14 @@
-const connection = require("./db");
-const cors = require("cors");
-const path = require("path");
-const express = require("express");
-const db = connection.promise();
-
-
-// server.js (ส่วนบน)
 require('dotenv').config();
-
+const express = require("express");
+const cors = require("cors");
+const connection = require("./db");
+const db = connection.promise(); // ✅ ใช้ mysql2 แบบ promise
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
 
 
 

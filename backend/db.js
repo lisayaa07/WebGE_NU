@@ -1,27 +1,27 @@
-const mysql = require("mysql2");
-const fs = require("fs");
-require("dotenv").config(); // โหลดค่าจาก .env
+// ✅ ใช้ mysql2 ไม่ใช่ Pool (PostgreSQL)
+const mysql = require('mysql2');
+const fs = require('fs');
 
+// ✅ สร้างการตั้งค่า SSL (Aiven ต้องใช้ SSL)
+let sslConfig = { rejectUnauthorized: true };
+
+if (process.env.AIVEN_CA_CERT) {
+  // ✅ ถ้า Render มี cert ใน environment variable
+  sslConfig.ca = process.env.AIVEN_CA_CERT;
+} else {
+  // ✅ ถ้า run ในเครื่อง ใช้ไฟล์ cert จาก local
+  sslConfig.ca = fs.readFileSync('./certificate/ca.pem').toString();
+}
+
+// ✅ สร้าง connection สำหรับ MySQL (ไม่ต้องใช้ Pool)
 const connection = mysql.createConnection({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
   port: process.env.DB_PORT,
-  ssl: {
-    ca: fs.readFileSync(process.env.DB_CA_CERT_PATH).toString(),
-    require: true, // บังคับใช้ SSL/TLS (ค่า default ใน Aiven มักจะตั้งให้เป็น require)
-    rejectUnauthorized: true, // ค่า default คือ true, บังคับตรวจสอบใบรับรอง
-  },
+  ssl: sslConfig
 });
 
-// ตรวจสอบการเชื่อมต่อ
-connection.connect((err) => {
-  if (err) {
-    console.error("❌ ไม่สามารถเชื่อมต่อกับฐานข้อมูล:", err);
-    return;
-  }
-  console.log("✅ เชื่อมต่อฐานข้อมูลสำเร็จ!");
-});
-
+// ✅ export connection ไปใช้ใน server.js
 module.exports = connection;
