@@ -13,7 +13,8 @@ const iconNames = [
   'clipboard-list',
   'truck-fast',
   'bars',
-  'chevron-down'
+  'chevron-down',
+  'pen'
 ]
 
 const iconNameRegular = [

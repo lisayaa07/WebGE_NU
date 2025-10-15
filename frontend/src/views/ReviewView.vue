@@ -472,7 +472,7 @@ function resetForm() {
 
             <!-- ปุ่ม submit -->
             <div class="text-center">
-                <button type="submit" class="btn btn-primary">Submit</button>
+                <button type="submit" class="btn bg-[#CD5C5C] hover:bg-[#B22222] text-white">Submit</button>
             </div>
         </form>
     </Layout>

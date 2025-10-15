@@ -7,6 +7,7 @@ import axios from 'axios'
 import { library } from '@fortawesome/fontawesome-svg-core'
 import { faHeart as farHeart } from '@fortawesome/free-regular-svg-icons'
 import { faHeart as fasHeart } from '@fortawesome/free-solid-svg-icons'
+
 library.add(farHeart, fasHeart)
 
 
@@ -133,10 +134,6 @@ function Comments (subject) {
                                 : 'text-red-500/40 hover:text-red-500 transition-colors duration-150'"
                             />
                             </button>
-
-
-
-
                         </div>
                     </div>
                 </div>

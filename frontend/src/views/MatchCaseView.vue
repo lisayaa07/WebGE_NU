@@ -477,7 +477,7 @@ const instructionTokens = Array.isArray(selectedinstruction.value)
 
             <!-- ปุ่ม submit -->
             <div class="text-center">
-                <button type="submit" class="btn btn-primary">คำนวณ</button>
+                <button type="submit" class="btn bg-[#FFB74D] hover:bg-[#F57C00] text-white">คำนวณ</button>
             </div>
 
             <!-- แสดงผลลัพธ์ -->

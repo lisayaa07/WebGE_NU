@@ -85,7 +85,7 @@ onMounted(async () => {
 <template>
   <Layout>
     <div class="p-6">
-      <h1 class="text-2xl font-semibold mb-4">การการโปรดของฉัน</h1>
+      <h1 class="text-2xl font-semibold mb-4">รายการโปรดของฉัน</h1>
 
       <!-- ไม่ได้ล็อกอิน -->
       <div v-if="!isLoggedIn" class="text-gray-600">

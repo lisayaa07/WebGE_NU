@@ -82,7 +82,7 @@ onMounted(() => {
       </div>
 
       <div class="text-center">
-        <RouterLink to="/matchcase" class="btn btn-error">ย้อนกลับ</RouterLink>
+        <RouterLink to="/matchcase" class="btn bg-[#CD5C5C] hover:bg-[#B22222] text-white">ย้อนกลับ</RouterLink>
       </div>
     </div>
   </Layout>

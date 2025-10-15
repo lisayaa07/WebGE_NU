@@ -9,9 +9,6 @@ const db = connection.promise();
 require('dotenv').config();
 
 
-
-
-
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -546,7 +543,7 @@ app.post('/cbr-match', (req, res) => {
   const params = [];
 
   if (Array.isArray(group_types) && group_types.length) {
-    sql += ` WHERE fr.group_type IN (${group_types.map(()=>'?').join(',')})`;
+    sql += ` WHERE fr.group_type IN (${group_types.map(() => '?').join(',')})`;
     params.push(...group_types);
   }
 
@@ -559,16 +556,16 @@ app.post('/cbr-match', (req, res) => {
     try {
       // ---------- น้ำหนัก ----------
       const baseW = {
-        interestd: 20,
-        exam: 15,
-        instruction: 12,  // ✅ ใช้กับ Dice ได้เลย
-        groupwork: 10,
-        solowork: 10,
-        experience: 8,
-        challenge: 6,
-        time: 4,
-        attendance: 2,
-        present: 1,
+        interestd: 25,
+        exam: 32,
+        instruction: 28,
+        groupwork: 24,
+        solowork: 19,
+        experience: 30,
+        challenge: 22,
+        time: 25,
+        attendance: 38,
+        present: 31,
       };
       const W = { ...baseW, ...(weights || {}) };
 
@@ -633,7 +630,7 @@ app.post('/cbr-match', (req, res) => {
       // ✅ รวม instruction หลายค่า (instructions[]) + เดี่ยว (instruction)
       const userInstrTokens = normInstrTokens([
         ... (Array.isArray(instructions) ? instructions : []),
-        ... parseCsv(instruction)
+        ...parseCsv(instruction)
       ]);
 
       // ---------- ประมวลผลเคส ----------
@@ -644,19 +641,19 @@ app.post('/cbr-match', (req, res) => {
 
         // ถ้าคุณยังอยากได้ ordinal สำหรับ “ค่าเดียว” ก็ปล่อยไว้ได้ แต่ให้ Dice เป็นตัวหลัก
         const sims = {
-          interestd:  diceTokens(userInterestTokens, caseInterestTokens),
-          groupwork:  simInverseAbs(groupwork,   r.groupwork_ID),
-          solowork:   simInverseAbs(solowork,    r.solowork_ID),
-          exam:       simCodeOrdinal(ensurePrefix(exam, 'C'), r.exam_ID, { expectedPrefix: 'C', min: 0, max: 7 }),
-          attendance: simInverseAbs(attendance,  r.attendance_ID),
+          interestd: diceTokens(userInterestTokens, caseInterestTokens),
+          groupwork: simInverseAbs(groupwork, r.groupwork_ID),
+          solowork: simInverseAbs(solowork, r.solowork_ID),
+          exam: simCodeOrdinal(ensurePrefix(exam, 'C'), r.exam_ID, { expectedPrefix: 'C', min: 0, max: 7 }),
+          attendance: simInverseAbs(attendance, r.attendance_ID),
 
           // ✅ ใช้ Dice สำหรับ “หลายค่า”
           instruction: diceTokens(userInstrTokens, caseInstrTokens),
 
-          present:    simInverseAbs(present,     r.present_ID),
-          experience: simInverseAbs(experience,  r.experience_ID),
-          challenge:  simInverseAbs(challenge,   r.challenge_ID),
-          time:       simInverseAbs(time,        r.time_ID),
+          present: simInverseAbs(present, r.present_ID),
+          experience: simInverseAbs(experience, r.experience_ID),
+          challenge: simInverseAbs(challenge, r.challenge_ID),
+          time: simInverseAbs(time, r.time_ID),
         };
 
         // รวมคะแนนตามน้ำหนัก (นับเฉพาะ sim ที่ไม่ใช่ null)
@@ -669,7 +666,7 @@ app.post('/cbr-match', (req, res) => {
           const w = Number(W[k]) || 0;
           if (w <= 0) continue;
           score += w * s;
-          wsum  += w;
+          wsum += w;
           contribs[k] = { w, s, ws: w * s };
           weightsUsed[k] = w;
         }
@@ -841,7 +838,7 @@ function normalizeSubjectId(x) {
 app.get('/favorites/ids', async (req, res) => {
   try {
     const studentId = String(req.query.student_id || '').trim();
-    if (!studentId) return res.status(400).json({ ok:false, message:'student_id required' });
+    if (!studentId) return res.status(400).json({ ok: false, message: 'student_id required' });
 
     const [rows] = await db.query(
       'SELECT subject_ID FROM Favorite WHERE student_ID = ?',
@@ -850,7 +847,7 @@ app.get('/favorites/ids', async (req, res) => {
     res.json(rows.map(r => r.subject_ID));
   } catch (e) {
     console.error('favorites ids error:', e);
-    res.status(500).json({ ok:false, message:'Database error' });
+    res.status(500).json({ ok: false, message: 'Database error' });
   }
 });
 
@@ -859,7 +856,7 @@ app.post('/favorites', async (req, res) => {
   try {
     let { student_id, subject_id } = req.body || {};
     if (!student_id || !subject_id) {
-      return res.status(400).json({ ok:false, message:'student_id and subject_id required' });
+      return res.status(400).json({ ok: false, message: 'student_id and subject_id required' });
     }
     const sid = normalizeSubjectId(subject_id);
 
@@ -869,7 +866,7 @@ app.post('/favorites', async (req, res) => {
       [sid]
     );
     if (!row || !row.gt) {
-      return res.status(400).json({ ok:false, message:'subject not found or no group type' });
+      return res.status(400).json({ ok: false, message: 'subject not found or no group type' });
     }
 
     await db.query(
@@ -879,10 +876,10 @@ app.post('/favorites', async (req, res) => {
       [student_id, sid, row.gt]
     );
 
-    res.json({ ok:true });
+    res.json({ ok: true });
   } catch (e) {
     console.error('favorite add error:', e);
-    res.status(500).json({ ok:false, message:'Database error' });
+    res.status(500).json({ ok: false, message: 'Database error' });
   }
 });
 
@@ -893,16 +890,16 @@ app.delete('/favorites', async (req, res) => {
     const studentId = String(req.query.student_id || '').trim();
     const subjectId = normalizeSubjectId(req.query.subject_id);
     if (!studentId || !subjectId) {
-      return res.status(400).json({ ok:false, message:'student_id and subject_id required' });
+      return res.status(400).json({ ok: false, message: 'student_id and subject_id required' });
     }
     await db.query(
       'DELETE FROM Favorite WHERE student_ID = ? AND subject_ID = ?',
       [studentId, subjectId]
     );
-    res.json({ ok:true });
+    res.json({ ok: true });
   } catch (e) {
     console.error('favorite delete error:', e);
-    res.status(500).json({ ok:false, message:'Database error' });
+    res.status(500).json({ ok: false, message: 'Database error' });
   }
 });
 
@@ -910,7 +907,7 @@ app.delete('/favorites', async (req, res) => {
 app.get('/favorites/grouped', async (req, res) => {
   try {
     const studentId = String(req.query.student_id || '').trim();
-    if (!studentId) return res.status(400).json({ ok:false, message:'student_id required' });
+    if (!studentId) return res.status(400).json({ ok: false, message: 'student_id required' });
 
     // ดึงวิชาโปรดของนิสิต พร้อมชื่อหมวดวิชา
     const [rows] = await db.query(`
@@ -940,7 +937,7 @@ app.get('/favorites/grouped', async (req, res) => {
     res.json(grouped);
   } catch (e) {
     console.error('favorites grouped error:', e);
-    res.status(500).json({ ok:false, message:'Database error' });
+    res.status(500).json({ ok: false, message: 'Database error' });
   }
 });
 
@@ -1006,7 +1003,43 @@ app.get('/popular-subjects', async (req, res) => {
   }
 });
 
+app.put('/students/:id', (req, res) => {
+    // 1. ดึง ID และ "ชื่อใหม่" จากข้อมูลที่ Frontend ส่งมา
+    const studentId = req.params.id;
+    const { name } = req.body; 
 
+    // 2. ตรวจสอบข้อมูลเบื้องต้น
+    if (!name) {
+        console.error("Validation Error: Name is required.");
+        return res.status(400).json({ error: 'Name is required' });
+    }
+
+    // 3. สร้างคำสั่ง SQL เพื่ออัปเดตฐานข้อมูล
+    const sql = "UPDATE Student SET student_Name = ? WHERE student_ID = ?";
+    
+    // 4. ส่งคำสั่งไปทำงานที่ฐานข้อมูล
+    db.query(sql, [name, studentId], (err, result) => {
+        // จัดการ Error กรณีฐานข้อมูลทำงานผิดพลาด
+        if (err) {
+            console.error("Database Error on UPDATE:", err);
+            return res.status(500).json({ error: 'Database update failed' });
+        }
+        
+        // จัดการ Error กรณีไม่พบ ID ที่ต้องการอัปเดต
+        if (result.affectedRows === 0) {
+            console.warn(`Update Warning: Student with ID ${studentId} not found.`);
+            return res.status(404).json({ error: 'Student not found' });
+        }
+        
+        // 5. เมื่อ UPDATE สำเร็จ ให้ส่งข้อมูลที่ถูกต้องกลับไป
+        console.log(`✅ Success: Updated student ID ${studentId} to name "${name}". Responding to client.`);
+        
+        res.status(200).json({ 
+            student_ID: studentId,
+            student_Name: name // <<-- ส่ง "ชื่อใหม่" กลับไป
+        });
+    });
+});
 
 
 // ✅ เริ่ม server
