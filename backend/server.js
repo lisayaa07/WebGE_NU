@@ -2,8 +2,9 @@
 const cors = require("cors");
 const path = require("path");
 const express = require("express");
-const db = connection.promise();
-const connection = require("./db");  
+
+const connection = require("./db");
+const db = connection.promise();  
 
 
 
