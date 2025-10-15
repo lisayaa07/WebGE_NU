@@ -33,8 +33,8 @@ onMounted(() => {
 
 <template>
   <Layout>
-    <div class="bg-base-100 shadow p-6 rounded-3xl mt-10 mx-3">
-      <h1 class="text-2xl font-bold">วิชาที่เหมาะกับนิสิต</h1>
+    <div class="bg-[#6495ED]/35 shadow p-6 rounded-3xl mt-10 mx-3">
+      <h1 class="text-3xl font-bold text-black/70">วิชาที่เหมาะกับนิสิต</h1>
 
       <div v-if="store.errorMsg" class="alert alert-error">{{ store.errorMsg }}</div>
 
@@ -44,15 +44,15 @@ onMounted(() => {
 
       <div v-else class="ml-5 mt-5">
         <div v-for="g in groups" :key="g.group_type || g.group_type_name" class="mb-8">
-          <h2 class="text-xl font-bold mb-3">
+          <h2 class="text-2xl font-bold mb-3 text-[#696969]">
             {{ g.group_type_name || g.group_type }}
           </h2>
 
           <div v-if="!g.items || !g.items.length" class="opacity-60">— ไม่มีผลลัพธ์ในกลุ่มนี้ —</div>
 
-          <div v-else class="ml-15">
+          <div v-else class="ml-15 mt-6">
             <div v-for="c in g.items" :key="c.subject_ID" class="flex justify-between my-4">
-              <div class="font-medium">
+              <div class="text-xl">
                 {{ c.subject_Name || ('วิชา #' + c.subject_ID) }}
               </div>
               <div class="flex gap-3 items-center">
@@ -62,7 +62,7 @@ onMounted(() => {
                 </div>
 
                 <!-- เปอร์เซ็นต์ -->
-                <div class="badge badge-warning badge-lg">
+                <div class="badge bg-pink-400 text-white badge-lg">
                   {{ Number(c.similarity).toFixed(2) }}%
                 </div>
 
@@ -73,7 +73,7 @@ onMounted(() => {
                   aria-label="ดูคอมเมนต์" title="ดูคอมเมนต์"
                   @click="Comments(c)"
                 >
-                  <FontAwesomeIcon icon="comment-dots" size="xl" class="text-gray-600" />
+                  <FontAwesomeIcon icon="comment-dots" size="xl" class="text-[#192F4E]" />
                 </button>
               </div>
             </div>
@@ -82,7 +82,7 @@ onMounted(() => {
       </div>
 
       <div class="text-center">
-        <RouterLink to="/matchcase" class="btn bg-[#CD5C5C] hover:bg-[#B22222] text-white">ย้อนกลับ</RouterLink>
+        <RouterLink to="/matchcase" class="btn bg-pink-300 hover:bg-pink-500 text-white">ย้อนกลับ</RouterLink>
       </div>
     </div>
   </Layout>

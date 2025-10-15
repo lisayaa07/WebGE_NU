@@ -266,14 +266,14 @@ const instructionTokens = Array.isArray(selectedinstruction.value)
         
         <form class="p-6 space-y-6" @submit.prevent="onSubmit">
             <!-- ความสนใจ -->
-            <div class="bg-[#F992AF]/50 p-6 rounded-3xl grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="bg-[#6495ED]/50 p-6 rounded-3xl grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                    <h2 class="font-bold mb-2">ความสนใจ (เลือกได้มากกว่า 1 คำคอบ)</h2>
                     <label class="block"
                         v-for="it in interestds" :key="it.interest_ID"
                         :for="`interest-${it.interest_ID}`">
                     <input type="checkbox"
-                            class="checkbox checkbox-sm border-pink-400 bg-pink-300 checked:border-pink-700 checked:bg-pink-600"
+                            class="checkbox checkbox-sm border-blue-500 bg-blue-300 checked:border-blue-700 checked:bg-blue-600"
                             :id="`interest-${it.interest_ID}`"
                             :value="String(it.interest_ID)"
                             v-model="selectedInterestd">
@@ -285,7 +285,7 @@ const instructionTokens = Array.isArray(selectedinstruction.value)
                     <label class="block"
                         v-for="g in subjectGroups" :key="g.GroupType_ID">
                     <input type="checkbox"
-                            class="checkbox checkbox-sm border-pink-400 bg-pink-300 checked:border-pink-700 checked:bg-pink-600"
+                            class="checkbox checkbox-sm border-blue-500 bg-blue-300 checked:border-blue-700 checked:bg-blue-600"
                             :value="g.GroupType_ID"
                             v-model="selectedGroupTypes">
                     {{ g.GroupType_Name }}
@@ -294,18 +294,18 @@ const instructionTokens = Array.isArray(selectedinstruction.value)
             </div>
 
             <!-- งานกลุ่ม -->
-            <div class="bg-[#FFAE00]/35 p-6 rounded-3xl">
+            <div class="bg-[#6495ED]/35 p-6 rounded-3xl">
                 <h2 class="font-bold mb-3">เลือกคำตอบที่นิสิตคิดว่าตรงกับตนเองมากที่สุด</h2>
                 <fieldset class="mb-4 pl-5">
                      <legend>
                         1. นิสิตต้องการให้มีการมอบหมาย 
-                        <span style="color:red;">งานกลุ่ม</span> 
-                        ในรายวิชาอย่างไร <span style="color:red;">*</span>
+                        <a class="underline decoration-red-500 text-red-500">งานกลุ่ม</a>ในรายวิชาอย่างไร 
+                        <a class="text-red-500">*</a>
                     </legend>
                     <div class="pl-5">
                     <label class="block" v-for="o in groupwork" :key="o.groupwork_ID">
                         <input type="radio" name="groupwork"
-                            class="radio radio-sm radio-error bg-white/50"
+                            class="radio radio-sm bg-blue-100 border-blue-500 checked:bg-blue-200 checked:text-blue-600 checked:border-blue-600"
                             :value="o.groupwork_ID"
                             v-model="selectedGroupwork">
                         {{ o.groupwork_Name }}
@@ -314,17 +314,17 @@ const instructionTokens = Array.isArray(selectedinstruction.value)
                 </fieldset>
             </div>
 
-            <div class="bg-[#FBCAA8]/95 p-6 rounded-3xl">
+            <div class="bg-[#ADD8E6]/60 p-6 rounded-3xl">
                 <fieldset class="pl-5">
                    <legend>
                         2. นิสิตต้องการให้มีการมอบหมาย 
-                        <span style="color:red;">งานเดี่ยว</span> 
-                        ในรายวิชาอย่างไร <span style="color:red;">*</span>
+                        <a class="underline decoration-red-500 text-red-500">งานเดี่ยว</a>ในรายวิชาอย่างไร 
+                        <a class="text-red-500">*</a>
                     </legend>
                     <div class="pl-5">
                     <label class="block" v-for="o in soloWork" :key="o.solowork_ID">
                         <input type="radio" name="solowork"
-                            class="radio radio-sm radio-error bg-white/50"
+                            class="radio radio-sm bg-blue-100 border-blue-500 checked:bg-blue-200 checked:text-blue-600 checked:border-blue-600 bg-white/50"
                             :value="o.solowork_ID"
                             v-model="selectedsolowork">
                         {{ o.solowork_Name }}
@@ -334,17 +334,17 @@ const instructionTokens = Array.isArray(selectedinstruction.value)
                 </fieldset>
             </div>
 
-            <div class="bg-[#F992AF]/50 p-6 rounded-3xl">
+            <div class="bg-[#6495ED]/50 p-6 rounded-3xl">
                 <fieldset class="pl-5">
                   <legend>
                         3.นิสิตต้องการให้มีรูปแบบ
-                        <span style="color:red;">การสอบ</span> แบบใด 
-                        <span style="color:red;">*</span>
+                        <a class="underline decoration-red-500 text-red-500">การสอบ</a> แบบใด 
+                        <a class="text-red-500">*</a>
                     </legend>
                     <div class="pl-5">
                     <label class="block" v-for="o in exam" :key="o.exam_ID">
                         <input type="radio" name="exam"
-                            class="radio radio-sm radio-error bg-white/50"
+                            class="radio radio-sm bg-blue-100 border-blue-500 checked:bg-blue-200 checked:text-blue-600 checked:border-blue-600"
                             :value="o.exam_ID"            
                             v-model="selectedexam">
                         {{ o.exam_Name }}
@@ -355,16 +355,17 @@ const instructionTokens = Array.isArray(selectedinstruction.value)
 
             </div>
 
-            <div class="bg-[#FFAE00]/35 p-6 rounded-3xl">
+            <div class="bg-[#6495ED]/35 p-6 rounded-3xl">
                 <fieldset class="pl-5">
                     <legend>
-                        4.นิสิตต้องการให้มีการ <span style="color:red;">เช็คชื่อ</span> เข้าห้องเรียนอย่างไร 
-                        <span style="color:red;">*</span>
+                        4.นิสิตต้องการให้มีการ 
+                        <a class="underline decoration-red-500 text-red-500">เช็คชื่อ</a> เข้าห้องเรียนอย่างไร 
+                        <a class="text-red-500">*</a>
                     </legend>
                     <div class="pl-5">
                     <label class="block" v-for="o in attendance" :key="o.attendance_ID">
                         <input type="radio" name="attendance"
-                            class="radio radio-sm radio-error bg-white/50"
+                            class="radio radio-sm bg-blue-100 border-blue-500 checked:bg-blue-200 checked:text-blue-600 checked:border-blue-600"
                             :value="o.attendance_ID"
                             v-model="selectedattendance">
                         {{ o.attendance_Name }}
@@ -374,18 +375,18 @@ const instructionTokens = Array.isArray(selectedinstruction.value)
                      </div>
 
 
-            <div class="bg-[#FBCAA8]/95 p-6 rounded-3xl">
+            <div class="bg-[#ADD8E6]/60 p-6 rounded-3xl">
                 <fieldset class="pl-5">
                     <legend>
                         5.นิสิตต้องการให้รูปแบบ
-                        <span style="color:red;">การสอน</span> เป็นอย่างไร (ตอบได้มากกว่า 1 ข้อ)
-                        <span style="color:red;">*</span>
+                        <a class="underline decoration-red-500 text-red-500">การสอน</a> เป็นอย่างไร (ตอบได้มากกว่า 1 ข้อ)
+                        <a class="text-red-500">*</a>
                     </legend>
                     <div class="pl-5">
                     <label class="block" v-for="o in instruction" :key="o.instruction_ID"
                             :for="`inst-${o.instruction_ID}`">
                         <input type="checkbox"
-                            class="checkbox checkbox-sm border-pink-700 bg-white/50"
+                            class="checkbox checkbox-sm border-blue-500 bg-blue-300 checked:border-blue-700 checked:bg-blue-600"
                             :id="`inst-${o.instruction_ID}`"
                             :value="String(o.instruction_ID)"
                             v-model="selectedinstruction">
@@ -397,17 +398,17 @@ const instructionTokens = Array.isArray(selectedinstruction.value)
 
 
             <!-- 6. นำเสนอ -->
-            <div class="bg-[#F992AF]/50 p-6 rounded-3xl">
+            <div class="bg-[#6495ED]/50 p-6 rounded-3xl">
                 <fieldset class="pl-5">
                     <legend>
                         6.นิสิตชอบให้มีการ
-                        <span style="color:red;">นำเสนอหน้าชั้นเรียน</span> มากน้อยเพียงใด
-                        <span style="color:red;">*</span>
+                        <a class="underline decoration-red-500 text-red-500">นำเสนอหน้าชั้นเรียน</a> มากน้อยเพียงใด
+                        <a class="text-red-500">*</a>
                     </legend>
                     <div class="pl-5">
                     <label class="block" v-for="o in present" :key="o.present_ID">
                         <input type="radio" name="present"
-                            class="radio radio-sm radio-error bg-white/50"
+                            class="radio radio-sm bg-blue-100 border-blue-500 checked:bg-blue-200 checked:text-blue-600 checked:border-blue-600"
                             :value="o.present_ID"
                             v-model="selectedpresent">
                         {{ o.present_Name }}
@@ -417,17 +418,18 @@ const instructionTokens = Array.isArray(selectedinstruction.value)
                      </div>
 
                     
-            <div class="bg-[#FFAE00]/35 p-6 rounded-3xl">
+            <div class="bg-[#6495ED]/35 p-6 rounded-3xl">
                 <fieldset class="pl-5">
                     <legend>
                         7.นิสิตต้องการ
-                        <span style="color:red;">ประสบการณ์ใหม่ๆ</span> จากวิชานี้หรือไม่
-                        <span style="color:red;">*</span>
+                        <a class="underline decoration-red-500 text-red-500">ประสบการณ์ใหม่ๆ</a> จากวิชานี้หรือไม่
+                        <a class="text-red-500">*</a>
                     </legend>
                     <div class="pl-5">
                     <label class="block" v-for="o in experience" :key="o.experience_ID">
                         <input type="radio" name="experience"
-                            class="radio radio-sm radio-error bg-white/50"
+                            class="radio radio-sm bg-blue-100 border-blue-500 checked:bg-blue-200 checked:text-blue-600 checked:border-blue-600
+                            "
                             :value="o.experience_ID"
                             v-model="selectedexperience">
                         {{ o.experience_Name }}
@@ -436,17 +438,17 @@ const instructionTokens = Array.isArray(selectedinstruction.value)
                     </fieldset>
                      </div>
 
-                <div class="bg-[#FBCAA8]/95 p-6 rounded-3xl">
+                <div class="bg-[#ADD8E6]/60 p-6 rounded-3xl">
                   <fieldset class="pl-5">
                     <legend>
                         8.ระดับ
-                        <span style="color:red;">ความยากง่าย</span> ที่นิสิตต้องการ 
-                        <span style="color:red;">*</span>
+                        <a class="underline decoration-red-500 text-red-500">ความยากง่าย</a> ที่นิสิตต้องการ 
+                        <a class="text-red-500">*</a>
                     </legend>
                     <div class="pl-5">
                     <label class="block" v-for="o in challenge" :key="o.challenge_ID">
                         <input type="radio" name="challenge"
-                            class="radio radio-sm radio-error bg-white/50"
+                            class="radio radio-sm bg-blue-100 border-blue-500 checked:bg-blue-200 checked:text-blue-600 checked:border-blue-600"
                             :value="o.challenge_ID"
                             v-model="selectedchallenge">
                         {{ o.challenge_Name }}
@@ -455,17 +457,17 @@ const instructionTokens = Array.isArray(selectedinstruction.value)
                     </fieldset>
                      </div>
 
-                <div class="bg-[#F992AF]/50 p-6 rounded-3xl">
+                <div class="bg-[#6495ED]/50 p-6 rounded-3xl">
                     <fieldset class="pl-5">
                     <legend>
                        9.
-                        <span style="color:red;">ช่วงเวลา</span> ในการเรียนที่นิสิตต้องการ(ช่วงเช้า = 8.00-11.50 , ช่วงบ่าย = 13.00-16.50)
-                        <span style="color:red;">*</span>
+                        <a class="underline decoration-red-500 text-red-500">ช่วงเวลา</a> ในการเรียนที่นิสิตต้องการ(ช่วงเช้า = 8.00-11.50 , ช่วงบ่าย = 13.00-16.50)
+                        <a class="text-red-500">*</a>
                     </legend>
                     <div class="pl-5">
                     <label class="block" v-for="o in time" :key="o.time_ID">
                         <input type="radio" name="time"
-                            class="radio radio-sm radio-error bg-white/50"
+                            class="radio radio-sm bg-blue-100 border-blue-500 checked:bg-blue-200 checked:text-blue-600 checked:border-blue-600"
                             :value="o.time_ID"
                             v-model="selectedtime">
                         {{ o.time_Name }}
@@ -477,83 +479,9 @@ const instructionTokens = Array.isArray(selectedinstruction.value)
 
             <!-- ปุ่ม submit -->
             <div class="text-center">
-                <button type="submit" class="btn bg-[#FFB74D] hover:bg-[#F57C00] text-white">คำนวณ</button>
+                <button type="submit" class="btn bg-blue-900 hover:bg-[#192F4E] text-white text-xl mt-3 p-6">คำนวณ</button>
             </div>
 
-            <!-- แสดงผลลัพธ์ -->
-            <!-- <div class="mt-6">
-                <div v-if="loading" class="p-4">กำลังคำนวณเคส…</div>
-                <div v-else-if="errorMsg" class="p-4 text-error">{{ errorMsg }}</div>
-                <div v-else>
-                    <div v-if="!resultGroups.length" class="opacity-60">ยังไม่มีผลลัพธ์</div>
-
-                    <div v-for="g in resultGroups" :key="g.group_type" class="mb-8">
-                        <h2 class="text-xl font-bold mb-3">
-                            กลุ่มวิชา: {{ g.group_type_name || g.group_type }}
-                        </h2>
-
-                        <div v-if="!g.items?.length" class="opacity-60">— ไม่มีผลลัพธ์ในกลุ่มนี้ —</div>
-
-                        <div v-for="c in g.items" :key="c.subject_ID" class="card bg-base-100 shadow mb-3">
-                            <div class="card-body">
-                                <h3 class="card-title">
-                                    {{ c.subject_Name || ('วิชา #' + c.subject_ID) }}
-                                    <span class="badge badge-warning badge-lg ml-2">
-                                        {{ Number(c.similarity).toFixed(2) }}%
-                                    </span>
-                                </h3>
-                                <p class="text-sm opacity-70" v-if="c.review">{{ c.review }}</p>
-                                <details class="mt-2 opacity-80" v-if="c.dbg">
-                                    <summary>ดูดีบัก (ค่าผู้ใช้ vs เคส, น้ำหนัก, คอนทริบิวชัน)</summary>
-
-                                    <div class="mt-3 grid md:grid-cols-2 gap-4 text-sm">
-                                        <div class="p-3 rounded-xl bg-base-200">
-                                            <h4 class="font-semibold mb-2">ผู้ใช้กรอก</h4>
-                                            <pre class="text-xs whitespace-pre-wrap">{{ c.dbg.user_input }}</pre>
-                                        </div>
-                                        <div class="p-3 rounded-xl bg-base-200">
-                                            <h4 class="font-semibold mb-2">ค่าของเคส (DB)</h4>
-                                            <pre class="text-xs whitespace-pre-wrap">{{ c.dbg.case_values }}</pre>
-                                        </div>
-                                    </div>
-
-                                    <div class="mt-3 overflow-x-auto">
-                                        <table class="table table-zebra text-xs">
-                                            <thead>
-                                                <tr>
-                                                    <th>มิติ</th>
-                                                    <th>sim</th>
-                                                    <th>weight</th>
-                                                    <th>w*s</th>
-                                                    <th>% ต่อคะแนน</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                <tr v-for="(v, k) in c.dbg.contributions" :key="k">
-                                                    <td class="font-mono">{{ k }}</td>
-                                                    <td>{{ (c.sims[k] ?? 0).toFixed(3) }}</td>
-                                                    <td>{{ v.w }}</td>
-                                                    <td>{{ v.ws }}</td>
-                                                    <td>{{ v.ws_pct }}%</td>
-                                                </tr>
-                                            </tbody>
-                                            <tfoot>
-                                                <tr>
-                                                    <td class="font-semibold">รวม</td>
-                                                    <td></td>
-                                                    <td>{{ c.dbg.sums.wsum }}</td>
-                                                    <td>{{ c.dbg.sums.score }}</td>
-                                                    <td>{{ (c.dbg.sums.norm * 100).toFixed(2) }}%</td>
-                                                </tr>
-                                            </tfoot>
-                                        </table>
-                                    </div>
-                                </details>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div> -->
         </form>
     </Layout>
 </template>
