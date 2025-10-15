@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import pro from '/Photo/pro.png' // ← เปลี่ยนชื่อไฟล์ตามที่คุณวางจริง
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 const router = useRouter()
 const email = ref('')
 const password = ref('')
@@ -18,7 +19,7 @@ const onLogin = async (e) => {
   errorMsg.value = ''
   loading.value = true
   try {
-    const res = await fetch('http://localhost:3000/login', {
+    const res = await fetch(`${API_URL}/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: email.value.trim(), password: password.value })
