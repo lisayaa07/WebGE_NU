@@ -73,7 +73,7 @@ const onLogin = async (e) => {
 
           <label class="block mb-4">
             <span class="text-sm text-[#6B614B]">email</span>
-            <input v-model="email" class="input input-bordered w-full bg-white mt-2" placeholder="email"
+            <input v-model="email" class="input input-bordered w-full bg-white mt-2" placeholder="email(ลงท้ายด้วย @nu.ac.th)"
               pattern="^[^@\s]+@nu\.ac\.th$" required />
           </label>
 

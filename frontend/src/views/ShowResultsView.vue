@@ -1,12 +1,17 @@
 <script setup>
 import Layout from '@/layout/Layout.vue'
 import { computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, RouterLink } from 'vue-router'
 import { useResultsStore } from '@/stores/results'
+
+/* FontAwesome (local registration) */
+import { library } from '@fortawesome/fontawesome-svg-core'
+import { faCommentDots } from '@fortawesome/free-solid-svg-icons'
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
+library.add(faCommentDots)
 
 const router = useRouter()
 const store = useResultsStore()
-
 
 // อ่านจาก Pinia เท่านั้น
 const groups = computed(() =>
@@ -19,11 +24,22 @@ function backToForm() {
 }
 
 function Comments(c) {
+    if (!c || !c.subject_ID) return
     router.push({
         name: 'reviewsubjects',
-        params: { id: c.subject_ID },     // ✅ ส่ง subject_ID ไปเป็นพารามิเตอร์
-        query: { name: c.subject_Name || '', limit: 5 }, // ส่งชื่อไว้โชว์หัวเรื่อง + limit 5
+        params: { id: c.subject_ID },
+        query: { name: c.subject_Name || '', limit: 5 },
     })
+}
+
+// helper: แปลง similarity เป็นเปอร์เซ็นต์ที่อ่านง่าย
+function fmtPct(sim) {
+  if (sim == null) return '-'
+  const n = Number(sim)
+  if (!Number.isFinite(n)) return '-'
+  // ถ้าค่าดูเหมือน 0..1 ให้คูณ 100, ถ้า >1 ก็นับเป็นเปอร์เซ็นต์อยู่แล้ว
+  const val = n <= 1 ? n * 100 : n
+  return val.toFixed(2) + '%'
 }
 
 onMounted(() => {
