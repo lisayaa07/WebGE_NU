@@ -1,27 +1,24 @@
 const mysql = require("mysql2");
 const fs = require("fs");
+const { Pool } = require('pg');
 require("dotenv").config(); // โหลดค่าจาก .env
 
-const connection = mysql.createConnection({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
-  port: process.env.DB_PORT,
-  ssl: {
-    ca: fs.readFileSync(process.env.DB_CA_CERT_PATH).toString(),
-    require: true, // บังคับใช้ SSL/TLS (ค่า default ใน Aiven มักจะตั้งให้เป็น require)
-    rejectUnauthorized: true, // ค่า default คือ true, บังคับตรวจสอบใบรับรอง
-  },
+const sslConfig = {
+  rejectUnauthorized: true,
+};
+
+// ตรวจสอบว่าเราทำงานบน Render หรือไม่ (โดยดูจากตัวแปรที่เราเพิ่งสร้าง)
+if (process.env.AIVEN_CA_CERT) {
+  // ถ้ามีตัวแปรนี้ (ทำงานบน Render) ให้อ่านค่า ca จากตัวแปร
+  sslConfig.ca = process.env.AIVEN_CA_CERT;
+} else {
+  // มิฉะนั้น (ทำงานบนเครื่อง) ให้อ่านจากไฟล์เหมือนเดิม
+  sslConfig.ca = fs.readFileSync('./certificate/ca.pem').toString();
+}
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: sslConfig, // ← นำ object ที่ตั้งค่าแล้วมาใช้ตรงนี้
 });
 
-// ตรวจสอบการเชื่อมต่อ
-connection.connect((err) => {
-  if (err) {
-    console.error("❌ ไม่สามารถเชื่อมต่อกับฐานข้อมูล:", err);
-    return;
-  }
-  console.log("✅ เชื่อมต่อฐานข้อมูลสำเร็จ!");
-});
-
-module.exports = connection;
+module.exports = pool;
