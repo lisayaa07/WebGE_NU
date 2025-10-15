@@ -100,52 +100,6 @@ async function saveName() {
   }
 }
 
-// async function saveName() {
-//     if (editableName.value.trim() === '' || editableName.value === user.value.name) {
-//         isEditingName.value = false;
-//         return;
-//     }
-
-//     try {
-//         console.log('1. [SAVE] กำลังส่งข้อมูล:', { id: user.value.student_ID, name: editableName.value });
-
-//         const response = await axios.put(`http://localhost:3000/students/${user.value.student_ID}`, {
-//             name: editableName.value
-//         });
-
-//         console.log('2. [SAVE] ได้รับข้อมูลตอบกลับจาก Backend:', response.data);
-
-//         // ตรวจสอบว่า Backend ส่งข้อมูลกลับมาถูกต้องหรือไม่
-//         if (response.data && response.data.student_Name) {
-//             const updatedUser = response.data;
-
-//             console.log('3. [SAVE] ชื่อเก่าใน State:', user.value.name);
-
-//             // --- ส่วนที่สำคัญที่สุด ---
-//             // อัปเดต State ของ Vue และ localStorage
-//             user.value.name = updatedUser.student_Name;
-//             localStorage.setItem('studentName', updatedUser.student_Name);
-
-//             console.log('4. [SAVE] ชื่อใหม่ใน State:', user.value.name);
-
-//             alert('อัปเดตชื่อสำเร็จ!');
-//         } else {
-//             // ถ้า Backend ไม่ส่งข้อมูลกลับมา ให้โยน Error
-//             throw new Error('Backend did not return the updated user data.');
-//         }
-
-//     } catch (error) {
-//         console.error('5. [SAVE] เกิดข้อผิดพลาด:', error);
-//         alert('เกิดข้อผิดพลาดในการอัปเดตชื่อ');
-//     } finally {
-//         // --- ส่วนที่สำคัญที่สุด ---
-//         // บล็อก finally จะทำงาน "เสมอ" ไม่ว่าจะสำเร็จหรือล้มเหลว
-//         // ทำให้ปุ่มบันทึกและยกเลิกหายไปแน่นอน
-//         console.log('6. [SAVE] ปิดโหมดแก้ไข (finally block)');
-//         isEditingName.value = false;
-//     }
-// }
-
 function openProfile() {
     const dlg = document.getElementById('profileModal')
     if (dlg && typeof dlg.showModal === 'function') {
@@ -153,11 +107,6 @@ function openProfile() {
         dlg.showModal()
     }
 }
-
-// function openProfile() {
-//     const dlg = document.getElementById('profileModal')
-//     if (dlg && typeof dlg.showModal === 'function') dlg.showModal()
-// }
 
 function logout() {
 
