@@ -2,37 +2,68 @@
 import Layout from '@/layout/Layout.vue'
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import axios from 'axios'
 
 import { library } from '@fortawesome/fontawesome-svg-core'
 import { faCommentDots } from '@fortawesome/free-solid-svg-icons'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 library.add(faCommentDots)
 
+// Base API URL (ตั้งใน .env: VITE_API_URL)
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 const router = useRouter()
-const popularGroups = ref([])
 
-const API = 'http://localhost:3000'
+const popularGroups = ref([])
+const loading = ref(false)
+const errorMsg = ref('')
+
+// helper: headers (ใส่ Authorization ถ้ามี token)
+function authHeaders() {
+  const headers = { 'Content-Type': 'application/json' }
+  const token = localStorage.getItem('token')
+  if (token) headers.Authorization = `Bearer ${token}`
+  return headers
+}
 
 // โหลดข้อมูล popular subjects
-onMounted(async () => {
+async function loadPopularSubjects() {
+  loading.value = true
+  errorMsg.value = ''
   try {
-    const res = await axios.get(`${API}/popular-subjects`)
-    popularGroups.value = res.data
+    const url = `${API_URL}/popular-subjects`
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: authHeaders()
+    })
+
+    // อ่าน json (หรือ null ถ้าไม่ใช่ json)
+    const j = await res.json().catch(() => null)
+    if (!res.ok) {
+      throw new Error(j?.message || res.statusText || 'Request failed')
+    }
+
+    // คาดว่า backend คืน array ของ groups
+    popularGroups.value = Array.isArray(j) ? j : (j?.items ?? [])
   } catch (err) {
     console.error('❌ โหลด popular subjects ล้มเหลว', err)
+    errorMsg.value = err.message || 'ไม่สามารถโหลดข้อมูลได้'
+  } finally {
+    loading.value = false
   }
-})
+}
 
 // ไปหน้ารีวิวรายวิชา
 function Comments(subject) {
   if (!subject?.subject_ID) return
   router.push({
-    name: 'reviewsubjects', 
+    name: 'reviewsubjects',
     params: { id: subject.subject_ID },
     query: { name: subject.subject_Name || '' },
   })
 }
+
+onMounted(() => {
+  loadPopularSubjects()
+})
 </script>
 
 <template>

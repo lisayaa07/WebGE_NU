@@ -2,20 +2,16 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useResultsStore } from '@/stores/results'
-
-
 import Layout from '@/layout/Layout.vue'
-import api from '@/api/api'
-
 
 const router = useRouter()
 const resultsStore = useResultsStore()
 
+// Base API URL (จาก .env: VITE_API_URL)
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+
+// ---------- state: คำตอบผู้ใช้ ----------
 const userCase = ref(null)
-
-
-/* ---------- state: คำตอบผู้ใช้ ---------- */
-
 
 // ข้อมูลที่โหลดจาก backend
 const faculties = ref([])
@@ -33,8 +29,6 @@ const experience = ref([])
 const challenge = ref([])
 const time = ref([])
 const solowork = ref([])
-
-
 
 // ตัวแปรที่ผูกกับ v-model
 const studentId = ref('')
@@ -58,226 +52,235 @@ const selectedGroupTypes = ref([])
 
 const resultGroups = ref([])
 
-/* ---------- state: ผลลัพธ์/โหลด/เออเรอร์ ---------- */
+// ---------- state: ผลลัพธ์/โหลด/เออเรอร์ ----------
 const loading = ref(false)
 const errorMsg = ref('')
 const results = ref([])
 
-
-/* ---------- helpers ---------- */
+// ---------- helpers ----------
+function authHeaders() {
+  const headers = { 'Content-Type': 'application/json' }
+  const token = localStorage.getItem('token')
+  if (token) headers.Authorization = `Bearer ${token}`
+  return headers
+}
 
 // robust: เลือกคีย์คะแนนที่มีอยู่จริง (กันชื่อไม่ตรง)
 function pickSimilarity(obj) {
-    const keys = ['similarity', 'similarityPct', 'score', 'percent', 'pct', 'Similarity']
-    for (const k of keys) {
-        if (obj && Object.prototype.hasOwnProperty.call(obj, k) && obj[k] != null) return obj[k]
-    }
-    return null
+  const keys = ['similarity', 'similarityPct', 'score', 'percent', 'pct', 'Similarity']
+  for (const k of keys) {
+    if (obj && Object.prototype.hasOwnProperty.call(obj, k) && obj[k] != null) return obj[k]
+  }
+  return null
 }
 
 // ฟังก์ชันช่วยแปลงเลขเป็น %
 function pct(v) {
-    if (v == null) return '-'
-    const num = Number(v)
-    if (!Number.isFinite(num)) return '-'
-    const p = num > 1 ? num : num * 100 // รองรับกรณี backend ส่ง 0–1
-    return p.toFixed(2) + '%'
+  if (v == null) return '-'
+  const num = Number(v)
+  if (!Number.isFinite(num)) return '-'
+  const p = num > 1 ? num : num * 100 // รองรับกรณี backend ส่ง 0–1
+  return p.toFixed(2) + '%'
 }
-
 
 function normalizeGroups(data) {
-    const arr = Array.isArray(data) ? data : (data?.items ?? [])
-    return arr
-        .map(x => ({
-            GroupType_ID: x.GroupType_ID ?? x.group_type_id ?? x.groupTypeId ?? x.id,
-            GroupType_Name: x.GroupType_Name ?? x.group_type_name ?? x.groupTypeName ?? x.name,
-        }))
-        .filter(x => x.GroupType_ID && x.GroupType_Name)
+  const arr = Array.isArray(data) ? data : (data?.items ?? [])
+  return arr
+    .map(x => ({
+      GroupType_ID:   x.GroupType_ID   ?? x.group_type_id ?? x.groupTypeId ?? x.id,
+      GroupType_Name: x.GroupType_Name ?? x.group_type_name ?? x.groupTypeName ?? x.name,
+    }))
+    .filter(x => x.GroupType_ID && x.GroupType_Name)
 }
 
+// helper: fetch GET + json + throw on not ok
+async function fetchGet(path) {
+  const res = await fetch(`${API_URL}${path.startsWith('/') ? '' : '/'}${path}`, {
+    method: 'GET',
+    headers: authHeaders()
+  })
+  const j = await res.json().catch(() => null)
+  if (!res.ok) {
+    throw new Error(j?.message || res.statusText || 'Request failed')
+  }
+  return j
+}
 
-//โหลดข้อมูลตอน mount
-onMounted(async () => {
-    try {
-        const [
-            gRes, fRes, iRes, grRes, gwRes, swRes, exRes, attRes, inRes, preRes, expRes, cRes, tRes
-        ] = await Promise.all([
-            api.get('/subject-groups'),
-            api.get('/faculty'),
-            api.get('/interestd'),
-            api.get('/grades'),
-            api.get('/groupwork'),
-            api.get('/solowork'),
-            api.get('/exam'),
-            api.get('/attendance'),
-            api.get('/instruction'),
-            api.get('/present'),
-            api.get('/experience'),
-            api.get('/challenge'),
-            api.get('/time'),
-        ])
-
-        // ✅ กลุ่มวิชา: map ให้แน่ใจว่าเป็น { GroupType_ID, GroupType_Name }
-        subjectGroups.value = normalizeGroups(gRes.data)
-        console.log('subjectGroups:', subjectGroups.value) // ดูในคอนโซลว่ามีไหม
-
-        // ที่เหลือปล่อยเป็น array ตรง ๆ ได้เหมือนเดิม
-        faculties.value = fRes.data ?? []
-        interestds.value = iRes.data ?? []
-        grades.value = grRes.data ?? []
-        groupwork.value = gwRes.data ?? []
-        soloWork.value = swRes.data ?? []
-        exam.value = exRes.data ?? []
-        attendance.value = attRes.data ?? []
-        instruction.value = inRes.data ?? []
-        present.value = preRes.data ?? []
-        experience.value = expRes.data ?? []
-        challenge.value = cRes.data ?? []
-        time.value = tRes.data ?? []
-
-        // ค่า default จาก localStorage (ของเดิม)
-        const email = localStorage.getItem('userEmail')
-        if (!email) return router.push({ name: 'login', query: { redirect: '/review' } })
-
-        studentId.value = localStorage.getItem('student_ID') || ''
-        selectedStudentLevel.value = localStorage.getItem('studentLevel') || ''
-        selectedFaculty.value = localStorage.getItem('facultyId') || ''
-    } catch (err) {
-        console.error("โหลดข้อมูลไม่สำเร็จ:", err?.response?.status, err?.response?.data || err.message)
-    }
-})
+// helper: fetch POST + json + throw on not ok
+async function fetchPost(path, body) {
+  const res = await fetch(`${API_URL}${path.startsWith('/') ? '' : '/'}${path}`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(body)
+  })
+  const j = await res.json().catch(() => null)
+  if (!res.ok) {
+    throw new Error(j?.message || res.statusText || 'Request failed')
+  }
+  return j
+}
 
 // เปิด/ปิดการล็อกดีบักในคอนโซล (ตั้ง false เมื่อปล่อยโปรดักชัน)
 const DEBUG_LOG = import.meta.env.DEV || import.meta.env.VITE_DEBUG_LOG === 'true'
 
 function logDebugItem(c) {
-    if (!DEBUG_LOG || !c?.dbg) return
+  if (!DEBUG_LOG || !c?.dbg) return
 
-    const name = c.subject_Name || `วิชา #${c.subject_ID}`
-    const simPct = Number(c.similarity ?? 0).toFixed(2)
+  const name = c.subject_Name || `วิชา #${c.subject_ID}`
+  const simPct = Number(c.similarity ?? 0).toFixed(2)
 
-    // กลุ่มแบบย่อ อ่านง่าย
-    console.groupCollapsed(`DBG: ${name} (similarity ${simPct}%)`)
+  console.groupCollapsed(`DBG: ${name} (similarity ${simPct}%)`)
+  console.log('ผู้ใช้กรอก:', c.dbg.user_input)
+  console.log('ค่าของเคส (DB):', c.dbg.case_values)
 
-    // 1) ค่าที่ผู้ใช้กรอก / ค่าของเคส
-    console.log('ผู้ใช้กรอก:', c.dbg.user_input)
-    console.log('ค่าของเคส (DB):', c.dbg.case_values)
+  const contribs = c.dbg.contributions || {}
+  const rows = Object.keys(contribs).map((k) => ({
+    dim: k,
+    sim: Number(c.sims?.[k] ?? 0).toFixed(3),
+    weight: contribs[k]?.w,
+    ws: contribs[k]?.ws,
+    pct: `${contribs[k]?.ws_pct}%`,
+  }))
+  if (rows.length) console.table(rows)
+  else console.log('ไม่มี contributions')
 
-    // 2) ตารางคอนทริบิวชัน (ใช้ console.table ให้อ่านง่าย)
-    const contribs = c.dbg.contributions || {}
-    const rows = Object.keys(contribs).map((k) => ({
-        dim: k,
-        sim: Number(c.sims?.[k] ?? 0).toFixed(3),
-        weight: contribs[k]?.w,
-        ws: contribs[k]?.ws,
-        pct: `${contribs[k]?.ws_pct}%`,
-    }))
-    if (rows.length) {
-        console.table(rows)
-    } else {
-        console.log('ไม่มี contributions')
-    }
-
-    // 3) สรุปรวม
-    console.log('สรุป:', c.dbg.sums)
-
-    console.groupEnd()
+  console.log('สรุป:', c.dbg.sums)
+  console.groupEnd()
 }
 
+// โหลดข้อมูลตอน mount (เรียกหลาย endpoint พร้อมกัน)
+onMounted(async () => {
+  try {
+    // ตรวจเช็ก user email / login (เหมือนเดิม)
+    const email = localStorage.getItem('userEmail')
+    if (!email) {
+      return router.push({ name: 'login', query: { redirect: '/review' } })
+    }
 
-/* ---------- submit ---------- */
+    // เรียก API พร้อมกัน (ใช้ fetchGet helper)
+    const paths = [
+      '/subject-groups',
+      '/faculty',
+      '/interestd',
+      '/grades',
+      '/groupwork',
+      '/solowork',
+      '/exam',
+      '/attendance',
+      '/instruction',
+      '/present',
+      '/experience',
+      '/challenge',
+      '/time'
+    ]
+
+    // ทำ Promise.all ของ fetchGet
+    const responses = await Promise.all(paths.map(p => fetchGet(p)))
+
+    // แยกผลตามลำดับเดิม
+    const [
+      gRes, fRes, iRes, grRes, gwRes, swRes, exRes, attRes, inRes, preRes, expRes, cRes, tRes
+    ] = responses
+
+    // กำหนดค่าให้ state
+    subjectGroups.value = normalizeGroups(gRes ?? [])
+    faculties.value   = fRes ?? []
+    interestds.value  = iRes ?? []
+    grades.value      = grRes ?? []
+    groupwork.value   = gwRes ?? []
+    soloWork.value    = swRes ?? []
+    exam.value        = exRes ?? []
+    attendance.value  = attRes ?? []
+    instruction.value = inRes ?? []
+    present.value     = preRes ?? []
+    experience.value  = expRes ?? []
+    challenge.value   = cRes ?? []
+    time.value        = tRes ?? []
+
+    // ค่า default จาก localStorage (ของเดิม)
+    studentId.value            = localStorage.getItem('student_ID')   || ''
+    selectedStudentLevel.value = localStorage.getItem('studentLevel') || ''
+    selectedFaculty.value      = localStorage.getItem('facultyId')    || ''
+  } catch (err) {
+    console.error("โหลดข้อมูลไม่สำเร็จ:", err)
+    errorMsg.value = err?.message || 'โหลดข้อมูลเริ่มต้นล้มเหลว'
+  }
+})
+
+// ---------- submit ----------
 async function onSubmit() {
-    errorMsg.value = ''
+  loading.value = true
+  errorMsg.value = ''
+  results.value = []
+  resultGroups.value = []
 
-    const missingFields = []
-    if (selectedInterestd.value.length === 0) missingFields.push('ความสนใจ')
-    if (selectedGroupTypes.value.length === 0) missingFields.push('หมวดวิชา')
-    if (!selectedGroupwork.value) missingFields.push('งานกลุ่ม')
-    if (!selectedsolowork.value) missingFields.push('งานเดี่ยว')
-    if (!selectedexam.value) missingFields.push('การสอบ')
-    if (!selectedattendance.value) missingFields.push('การเช็คชื่อ')
-    if (selectedinstruction.value.length === 0) missingFields.push('รูปแบบการสอน')
-    if (!selectedpresent.value) missingFields.push('การนำเสนอ')
-    if (!selectedexperience.value) missingFields.push('ประสบการณ์ใหม่ๆ')
-    if (!selectedchallenge.value) missingFields.push('ความยากง่าย')
-    if (!selectedtime.value) missingFields.push('ช่วงเวลา')
-    if (missingFields.length > 0) {
-        errorMsg.value = `กรุณาตอบคำถามให้ครบ: ${missingFields.join(', ')}`
-        return
+  const toD = (v) => /^\d+$/.test(String(v)) ? `D${v}` : String(v)
+  const instructionTokens = Array.isArray(selectedinstruction.value)
+    ? selectedinstruction.value.map(toD)
+    : []
+
+  try {
+    const payload = {
+      interestd: selectedInterestd.value,
+      groupwork: selectedGroupwork.value,
+      solowork: selectedsolowork.value,
+      exam: selectedexam.value,
+      attendance: selectedattendance.value,
+      instructions: instructionTokens,
+      instruction: instructionTokens[0] || '',
+      instruction_CSV: instructionTokens.join(','),
+      present: selectedpresent.value,
+      experience: selectedexperience.value,
+      challenge: selectedchallenge.value,
+      time: selectedtime.value,
+      group_types: selectedGroupTypes.value,
+      debug: true
     }
 
-    loading.value = true
-    results.value = []
+    console.log('PLYLOAD /cbr-match:', payload)
 
-    const toD = (v) => /^\d+$/.test(String(v)) ? `D${v}` : String(v)
-    const instructionTokens = Array.isArray(selectedinstruction.value)
-        ? selectedinstruction.value.map(toD)
-        : []
+    // เรียก POST /cbr-match ผ่าน fetchPost helper
+    const data = await fetchPost('/cbr-match', payload)
 
-    try {
-        const payload = {
-            interestd: selectedInterestd.value,
-            groupwork: selectedGroupwork.value,
-            solowork: selectedsolowork.value,
-            exam: selectedexam.value,   // จะได้ "C0" .. "C7"
-            attendance: selectedattendance.value,
+    // รับ groups จาก backend
+    resultGroups.value = Array.isArray(data.groups) ? data.groups : []
 
-            instructions: instructionTokens,
-            instruction: instructionTokens[0] || '',
-            instruction_CSV: instructionTokens.join(','),
-            present: selectedpresent.value,
-            experience: selectedexperience.value,
-            challenge: selectedchallenge.value,
-            time: selectedtime.value,
-            group_types: selectedGroupTypes.value,  // ✅ ส่งหลายกลุ่ม
-            debug: true,
-            // weights: { ... }  // (ถ้ามี)
+    // ใช้ top ถ้ามี ไม่งั้นใช้ all
+    const raw = (Array.isArray(data.top) && data.top.length ? data.top : data.all) || []
+
+    // ทำ mapping ให้มี field similarity เสมอ
+    results.value = raw.map(r => {
+      const s = pickSimilarity(r)
+      const n = Number(s)
+      return { ...r, similarity: Number.isFinite(n) ? n : 0 }
+    })
+
+    // เก็บผลลง store และไปหน้าแสดงผล
+    resultsStore.setResults({
+      resultGroups: resultGroups.value,
+      results: results.value,
+      payload
+    })
+
+    if (DEBUG_LOG) {
+      for (const g of resultGroups.value || []) {
+        for (const c of g.items || []) {
+          logDebugItem(c)
         }
-        console.log('PLYLOAD /cbr-match:', payload)
-        const { data } = await api.post('/cbr-match', payload)
-
-        // ✅ รับ groups จาก backend
-        resultGroups.value = Array.isArray(data.groups) ? data.groups : []
-
-        // ใช้ top ถ้ามี ไม่งั้นใช้ all
-        const raw = (Array.isArray(data.top) && data.top.length ? data.top : data.all) || []
-
-        // ✅ บังคับให้มี field similarity เสมอ (รองรับหลายชื่อ)
-        results.value = raw.map(r => {
-            const s = r.similarity ?? r.similarityPct ?? r.score ?? r.percent ?? r.pct ?? null
-            const n = Number(s)
-            return { ...r, similarity: Number.isFinite(n) ? n : 0 }
-        })
-
-        // debug
-        console.log('CBR response:', data)
-        console.log('Mapped results:', results.value)
-
-        // ✅ ส่งผลลัพธ์ไปเก็บใน Pinia store และไปหน้า /results 
-        resultsStore.setResults({
-            resultGroups: resultGroups.value,
-            results: results.value,
-            payload, // เก็บไว้เผื่อ debug/ย้อนกลับ 
-        })
-
-        if (DEBUG_LOG) {
-            for (const g of resultGroups.value || []) {
-                for (const c of g.items || []) {
-                    logDebugItem(c)
-                }
-            }
-        }
-
-        router.push({ name: 'showresults' }) // ไปหน้าแสดงผล
-
-
-    } catch (e) {
-        errorMsg.value = e?.response?.data?.message || e.message || 'เกิดข้อผิดพลาด'
-    } finally {
-        loading.value = false
+      }
     }
+
+    router.push({ name: 'showresults' })
+
+  } catch (e) {
+    console.error('CBR error:', e)
+    errorMsg.value = e?.message || 'เกิดข้อผิดพลาดในการประมวลผล'
+  } finally {
+    loading.value = false
+  }
 }
 </script>
+
 
 <template>
     <Layout>
