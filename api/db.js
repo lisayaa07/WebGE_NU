@@ -1,27 +1,26 @@
-// api/db.js (ใช้ Connection Pool สำหรับ Serverless)
+// api/db.js (Connection Pool ที่รองรับ Vercel Serverless และ Aiven SSL)
 
-const mysql = require('mysql2/promise'); 
+const mysql = require('mysql2/promise');
 
-// 1. สร้าง SSL Config จาก Environment Variable เท่านั้น
+// 1. สร้าง SSL Config
 const sslConfig = { 
+    // Aiven ต้องใช้ SSL
     rejectUnauthorized: true 
 };
 
-// 💡 ต้องตรวจสอบว่า Vercel มี CA Certificate ถูกตั้งค่าไว้ใน Environment Variable
+// 2. ตรวจสอบและแปลง Certificate จาก Environment Variable
 if (process.env.DB_CERTIFICATE_CA) { 
-    // ใช้เนื้อหาของไฟล์ ca.pem ที่ใส่ไว้ใน Environment Variable
-    sslConfig.ca = process.env.DB_CERTIFICATE_CA;
+    // Vercel เก็บค่าหลายบรรทัดเป็น String ที่มี \n แทนการขึ้นบรรทัด
+    // เราใช้ .replace(/\\n/g, '\n') เพื่อแปลงกลับเป็นค่าหลายบรรทัดที่ถูกต้อง
+    sslConfig.ca = process.env.DB_CERTIFICATE_CA.replace(/\\n/g, '\n');
 } else {
-    // ⚠️ ถ้าไม่พบ certificate ใน production จะมีปัญหา
-    console.warn("⚠️ DB_CERTIFICATE_CA not found in Environment Variables! Connection might fail.");
-    // 💡 หากเป็น localhost ให้ตั้งค่า SSL เป็น false (สำหรับการทดสอบ)
-    if (process.env.NODE_ENV !== 'production') {
-        sslConfig = undefined; 
-    }
+    // โค้ดนี้จะรันถ้า DB_CERTIFICATE_CA ไม่มีค่า
+    console.warn("⚠️ DB_CERTIFICATE_CA not found in Environment Variables! Check Vercel settings.");
+    // ถ้าไม่ตั้งค่าใน production การเชื่อมต่อจะล้มเหลว
 }
 
 
-// 2. สร้าง Connection Pool
+// 3. สร้าง Connection Pool
 const pool = mysql.createPool({
     host: process.env.DB_HOST,
     user: process.env.DB_USER,
@@ -30,11 +29,11 @@ const pool = mysql.createPool({
     port: process.env.DB_PORT,
     ssl: sslConfig,
     
-    // การตั้งค่าที่สำคัญสำหรับ Serverless
+    // การตั้งค่าสำหรับ Serverless
     waitForConnections: true,
     connectionLimit: 7, 
     queueLimit: 0,
 });
 
-// 3. Export Pool Promise ให้ serverless function ใช้
+// 4. Export Pool Promise
 module.exports = pool;
