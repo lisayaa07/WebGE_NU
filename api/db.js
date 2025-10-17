@@ -1,27 +1,26 @@
+// require ข้างบนไฟล์
+const express = require('express');
+const cors = require('cors');
+const cookieParser = require('cookie-parser');
+// ... other requires
 
-const mysql = require('mysql2/promise');
+const app = express();
 
-const sslConfig = { rejectUnauthorized: true };
-if (process.env.DB_CERTIFICATE_CA) {
-  sslConfig.ca = process.env.DB_CERTIFICATE_CA.replace(/\\n/g, '\n');
-} else {
-  console.warn("⚠️ DB_CERTIFICATE_CA not found in Environment Variables!");
-}
+// ตั้งค่า CORS — เปลี่ยนค่า origin ให้ตรงกับ front-end domain(s)
+const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || 'https://web-ge-nu-9943-602f2zfrb-chlisas-projects.vercel.app';
 
-const poolConfig = {
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
-  port: process.env.DB_PORT ? Number(process.env.DB_PORT) : undefined,
-  ssl: sslConfig,
-  waitForConnections: true,
-  connectionLimit: 7,
-  queueLimit: 0
+const corsOptions = {
+  origin: FRONTEND_ORIGIN,   // หรือเป็น array of origins ถ้ามีหลาย
+  methods: ['GET','POST','PUT','DELETE','OPTIONS'],
+  allowedHeaders: ['Content-Type','Authorization','X-Requested-With'],
+  credentials: true,         // สำคัญมากถ้าใช้ cookie
+  preflightContinue: false,
+  optionsSuccessStatus: 204
 };
 
-if (!global.__WEBGE_MYSQL_POOL) {
-  global.__WEBGE_MYSQL_POOL = mysql.createPool(poolConfig);
-}
-module.exports = global.__WEBGE_MYSQL_POOL;
-module.exports = app;
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions)); // ตอบ preflight สำหรับทุก route
+
+app.use(express.json());
+app.use(cookieParser());
+// ... rest of your middleware & routes
