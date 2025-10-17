@@ -1,50 +1,29 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import pro from '/Photo/pro.png' 
+import { loginApi } from '@/composables/auth' // หรือ path ที่ถูกต้อง
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 const router = useRouter()
-const email = ref('')
+const identifier = ref('')
 const password = ref('')
 const loading = ref(false)
-const errorMsg = ref('')
+const error = ref('')
 
-function isNuEmail(v) { return typeof v === 'string' && v.toLowerCase().endsWith('@nu.ac.th') }
-
-async function onLogin(e) {
-  e.preventDefault(); 
-  loading.value = true;
-  errorMsg.value = '';
-
+async function submitLogin() {
+  error.value = ''
+  loading.value = true
   try {
-    await doLogin(email.value, password.value);
-  } catch (error) {
-    errorMsg.value = error.message || 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ';
+    await loginApi(identifier.value, password.value)
+    // หลัง login สำเร็จ ให้ไปหน้าหลัก (ไม่แก้ template)
+    router.push('/')
+  } catch (e) {
+    error.value = e?.message || 'ไม่สามารถเข้าสู่ระบบได้'
   } finally {
-    loading.value = false;
+    loading.value = false
   }
 }
-
-
-async function doLogin(email, password) {
-  const res = await fetch(`${API_URL}/login`, {
-    method: 'POST',
-    credentials: 'include', // Backend จะเซ็ต cookie ให้
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password })
-  });
-
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok || !data.ok) {
-    throw new Error(data.message || 'Login failed');
-  }
-
-  // ✅ การแก้ไข: Redirect ไปที่หน้า Home ทันที
-  // ลบโค้ด localStorage ทั้งหมด
-  router.push({ name: 'home' });
-} 
 </script>
+
 
 <template>
   <div class="min-h-screen flex items-center justify-center bg-[#F6E8C8]">

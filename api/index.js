@@ -23,6 +23,28 @@ app.use((req, res, next) => {
   }
   next();
 });
+const expressJwt = (req, res, next) => {
+  const token = req.cookies?.token;
+  if (!token) return res.status(401).json({ ok: false, message: 'not authenticated' });
+  try {
+    const data = jwt.verify(token, process.env.JWT_SECRET || 'please_set_jwt_secret');
+    req.user = data; // { id, student_ID, name, ... }
+    next();
+  } catch (e) {
+    return res.status(401).json({ ok: false, message: 'invalid token' });
+  }
+};
+
+app.get('/me', expressJwt, async (req, res) => {
+  // คืนข้อมูลโปรไฟล์ที่จำเป็น (ไม่คืน password)
+  res.json({ ok: true, user: req.user });
+});
+
+// logout route
+app.post('/logout', (_req, res) => {
+  res.clearCookie('token', { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax' });
+  res.json({ ok: true });
+});
 
 // ✅ Route: Health Check
 app.get('/db-health', async (_req, res) => {
