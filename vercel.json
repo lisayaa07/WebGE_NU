@@ -1,42 +1,28 @@
 {
-      "version": 2,
-      "builds": [
-        {
-          "src": "api/index.js",
-          "use": "@vercel/node"
-        },
-        {
-          "src": "package.json",
-          "use": "@vercel/static-build",
-          "config": {
-            "outputDirectory": "dist"
-          }
-        }
-      ],
-      "routes": [
-        {
-          "src": "/db-health",
-          "dest": "api/index.js"
-        },
-        {
-          "src": "/login",
-          "dest": "api/index.js"
-        },
-        {
-          "src": "/register",
-          "dest": "api/index.js"
-        },
-        {
-          "src": "/me",
-          "dest": "api/index.js"
-        },
-        {
-          "src": "/logout",
-          "dest": "api/index.js"
-        },
-        {
-          "src": "/(.*)",
-          "dest": "api/index.js"
-        }
-      ]
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/index.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "outputDirectory": "dist"
+      }
     }
+  ],
+  "routes": [
+ 
+    {
+      "src": "/(db-health|testtt|faculty|grades|subject-groups|subjects|interestd|groupwork|solowork|exam|attendance|instruction|present|experience|challenge|time|submit-form|login|register|me|logout|cbr-match|grouped-subjects|favorites|popular-subjects)(.*)",
+      "dest": "api/index.js"
+    },
+
+    {
+      "src": "/(.*)",
+      "dest": "/dist/index.html" 
+    }
+  ]
+}

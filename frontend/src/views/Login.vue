@@ -1,7 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import pro from '/Photo/pro.png' // ← เปลี่ยนชื่อไฟล์ตามที่คุณวางจริง
+import pro from '/Photo/pro.png' 
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 const router = useRouter()
@@ -10,14 +10,27 @@ const password = ref('')
 const loading = ref(false)
 const errorMsg = ref('')
 
-
-
 function isNuEmail(v) { return typeof v === 'string' && v.toLowerCase().endsWith('@nu.ac.th') }
+
+async function onLogin(e) {
+  e.preventDefault(); 
+  loading.value = true;
+  errorMsg.value = '';
+
+  try {
+    await doLogin(email.value, password.value);
+  } catch (error) {
+    errorMsg.value = error.message || 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ';
+  } finally {
+    loading.value = false;
+  }
+}
+
 
 async function doLogin(email, password) {
   const res = await fetch(`${API_URL}/login`, {
     method: 'POST',
-    credentials: 'include', // สำคัญ: backend จะเซ็ต cookie ให้
+    credentials: 'include', // Backend จะเซ็ต cookie ให้
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password })
   });
@@ -27,10 +40,10 @@ async function doLogin(email, password) {
     throw new Error(data.message || 'Login failed');
   }
 
-    router.push({ name: 'home' })
-  } 
-
-
+  // ✅ การแก้ไข: Redirect ไปที่หน้า Home ทันที
+  // ลบโค้ด localStorage ทั้งหมด
+  router.push({ name: 'home' });
+} 
 </script>
 
 <template>
