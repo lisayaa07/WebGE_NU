@@ -14,44 +14,22 @@ const errorMsg = ref('')
 
 function isNuEmail(v) { return typeof v === 'string' && v.toLowerCase().endsWith('@nu.ac.th') }
 
-const onLogin = async (e) => {
-  e.preventDefault()
-  errorMsg.value = ''
-  loading.value = true
-  try {
-    const res = await fetch(`${API_URL}/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: email.value.trim(), password: password.value })
-    })
-    const data = await res.json()
+async function doLogin(email, password) {
+  const res = await fetch(`${API_URL}/login`, {
+    method: 'POST',
+    credentials: 'include', // สำคัญ: backend จะเซ็ต cookie ให้
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password })
+  });
 
-    if (!res.ok || !data.ok) {
-      throw new Error(data.message || 'เข้าสู่ระบบไม่สำเร็จ')
-    }
-
-      // ⬇️ เก็บ user profile ลง localStorage
-    // หลัง login สำเร็จ
-    localStorage.setItem('token', data.token)
-    localStorage.setItem('auth', '1')
-    localStorage.setItem('userEmail', data.user.id)
-    localStorage.setItem('student_ID', data.user.student_ID || '')
-    localStorage.setItem('studentLevel', data.user.student_level || '')
-    localStorage.setItem('facultyId', data.user.faculty_ID || '')
-    localStorage.setItem('facultyName', data.user.faculty_Name || '')
-    localStorage.setItem('studentName',  data.user.name || '') 
-
-
-
-
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.ok) {
+    throw new Error(data.message || 'Login failed');
+  }
 
     router.push({ name: 'home' })
-  } catch (err) {
-    errorMsg.value = err.message || 'เกิดข้อผิดพลาด'
-  } finally {
-    loading.value = false
-  }
-}
+  } 
+
 
 </script>
 

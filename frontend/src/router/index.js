@@ -81,11 +81,25 @@ const router = createRouter({
 })
 
 
-// guard ง่าย ๆ
-router.beforeEach((to, from, next) => {
-  const loggedIn = !!(localStorage.getItem('userEmail') || '').trim()
-  if (to.meta.requiresAuth && !loggedIn) return next({ name: 'login' })
-  next()
-})
+// แทน router.beforeEach ปัจจุบัน
+router.beforeEach(async (to, from, next) => {
+  // ถ้า route ไม่ต้องล็อกอินก็ผ่าน
+  if (!to.meta?.requiresAuth) return next();
+
+  try {
+    const API = import.meta.env.VITE_API_URL || '';
+    // เรียก /me บน backend เพื่อเช็ค session cookie
+    const res = await fetch(`${API}/me`, { method: 'GET', credentials: 'include' });
+    if (!res.ok) {
+      return next({ name: 'login' });
+    }
+    // ถ้าต้องการข้อมูล user เก็บไว้ใน store ที่นี่ (Pinia) — แต่ถ้ายังไม่ใช้ store ก็แค่ allow
+    // const data = await res.json();
+    return next();
+  } catch (e) {
+    return next({ name: 'login' });
+  }
+});
+
 
 export default router

@@ -2,18 +2,25 @@ require('dotenv').config();
 const express = require("express");
 const cors = require("cors");
 const connection = require("./db");
-const db = connection.promise(); // ✅ ใช้ mysql2 แบบ promise
+const db = connection.promise();
+const cookieParser = require('cookie-parser');
+const jwt = require('jsonwebtoken');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
 
 
-
-
+// ป้องกันการแคช สำหรับหน้า HTML (ถ้า backend ของคุณ serve SPA index.html)
 app.use((req, res, next) => {
-  console.log(`📥 Request: ${req.method} ${req.url}`);
+  if (req.path === '/' || req.path.endsWith('.html')) {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+    res.set('Surrogate-Control', 'no-store');
+  }
   next();
 });
 
@@ -304,14 +311,9 @@ function isNuEmail(v) {
 }
 
 app.post('/login', (req, res) => {
-  // เปลี่ยนชื่อฟิลด์ให้สื่อชัด: email + password
   const { email, password } = req.body;
-  if (!email || !password) {
-    return res.status(400).json({ ok: false, message: 'กรอก Email และ Password' });
-  }
-  if (!isNuEmail(email)) {
-    return res.status(400).json({ ok: false, message: 'ต้องใช้อีเมล @nu.ac.th เท่านั้น' });
-  }
+  if (!email || !password) return res.status(400).json({ ok: false, message: 'กรอก Email และ Password' });
+  if (!isNuEmail(email)) return res.status(400).json({ ok: false, message: 'ต้องใช้อีเมล @nu.ac.th เท่านั้น' });
 
   // 👉 ใช้ email เป็นตัวล็อกอิน / JOIN ด้วย email
   const sql = `
@@ -331,35 +333,35 @@ app.post('/login', (req, res) => {
   `;
 
   connection.query(sql, [email.toLowerCase()], async (err, rows) => {
-    if (err) {
-      console.error('DB error:', err);
-      return res.status(500).json({ ok: false, message: 'Database Error' });
-    }
-    if (!rows.length) {
-      return res.status(401).json({ ok: false, message: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' });
-    }
+    if (err) return res.status(500).json({ ok: false, message: 'Database Error' });
+    if (!rows.length) return res.status(401).json({ ok: false, message: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' });
 
     const row = rows[0];
     const ok = await bcrypt.compare(password, row.password);
-    if (!ok) {
-      return res.status(401).json({ ok: false, message: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' });
-    }
+    if (!ok) return res.status(401).json({ ok: false, message: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' });
 
-    // ✅ สำเร็จ: ส่งโปรไฟล์กลับ
-    return res.json({
-      ok: true,
-      user: {
-        id: row.email,                               // ใช้ email เป็น id ของ session ฝั่ง client
-        student_ID: row.student_ID || '',            // เผื่อหน้าอื่นต้องใช้
-        name: row.student_Name || '',
-        student_level: row.student_level || '',
-        faculty_ID: row.faculty_ID || '',
-        faculty_Name: row.faculty_Name || ''
-      }
+    // สร้าง JWT
+    const payload = {
+      id: row.email,
+      student_ID: row.student_ID || '',
+      name: row.student_Name || '',
+      student_level: row.student_level || '',
+      faculty_ID: row.faculty_ID || ''
+    };
+    const token = jwt.sign(payload, process.env.JWT_SECRET || 'please_set_jwt_secret', { expiresIn: '7d' });
+
+    // เซ็ต HttpOnly cookie (ไม่สามารถอ่านจาก JS ได้)
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000
     });
+
+    // คืนเฉพาะข้อมูลโปรไฟล์ที่ไม่ลับ (client จะเก็บใน store แต่ไม่เก็บ token)
+    return res.json({ ok: true, user: { id: row.email, student_ID: row.student_ID || '', name: row.student_Name || '', student_level: row.student_level || '', faculty_ID: row.faculty_ID || '', faculty_Name: row.faculty_Name || '' }});
   });
 });
-
 
 
 
@@ -465,6 +467,25 @@ app.post('/register', (req, res) => {
     });
   });
 });
+
+
+app.get('/me', (req, res) => {
+  const token = req.cookies?.token;
+  if (!token) return res.status(401).json({ ok: false });
+
+  try {
+    const payload = jwt.verify(token, process.env.JWT_SECRET || 'please_set_jwt_secret');
+    return res.json({ ok: true, user: payload });
+  } catch (e) {
+    return res.status(401).json({ ok: false });
+  }
+});
+
+app.post('/logout', (req, res) => {
+  res.cookie('token', '', { maxAge: 0, httpOnly: true, secure: process.env.NODE_ENV === 'production' });
+  res.json({ ok: true });
+});
+
 
 
 
