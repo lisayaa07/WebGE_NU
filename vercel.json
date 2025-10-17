@@ -14,9 +14,9 @@
     }
   ],
   "routes": [
-
+    
     {
-      "src": "/(login|register|db-health|testtt|faculty|grades|subject-groups|subjects/.*|interestd|groupwork|solowork|exam|attendance|instruction|present|experience|challenge|time|submit-form|me|logout|cbr-match|grouped-subjects|favorites/.*|popular-subjects|students/.*)",
+      "src": "/api/(.*)",
       "dest": "api/index.js"
     },
 
