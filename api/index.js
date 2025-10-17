@@ -618,3 +618,4 @@ app.put('/students/:id', async (req, res) => { // ✅ เพิ่ม async
 });
 
 
+module.exports = app;

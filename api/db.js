@@ -1,12 +1,11 @@
+
 const mysql = require('mysql2/promise');
 
 const sslConfig = { rejectUnauthorized: true };
-
 if (process.env.DB_CERTIFICATE_CA) {
   sslConfig.ca = process.env.DB_CERTIFICATE_CA.replace(/\\n/g, '\n');
 } else {
-  // ถ้า DB ไม่ต้องการ SSL ให้ลบหรือตั้ง false
-  console.warn("DB_CERTIFICATE_CA not set — SSL CA missing");
+  console.warn("⚠️ DB_CERTIFICATE_CA not found in Environment Variables!");
 }
 
 const poolConfig = {
@@ -21,8 +20,8 @@ const poolConfig = {
   queueLimit: 0
 };
 
-// Reuse pool across lambda warm invocations
-if (!global.__MY_APP_MYSQL_POOL) {
-  global.__MY_APP_MYSQL_POOL = mysql.createPool(poolConfig);
+if (!global.__WEBGE_MYSQL_POOL) {
+  global.__WEBGE_MYSQL_POOL = mysql.createPool(poolConfig);
 }
-module.exports = global.__MY_APP_MYSQL_POOL;
+module.exports = global.__WEBGE_MYSQL_POOL;
+module.exports = app;
