@@ -1,26 +1,49 @@
-// require ข้างบนไฟล์
-const express = require('express');
-const cors = require('cors');
-const cookieParser = require('cookie-parser');
-// ... other requires
+// backend/db.js
+const mysql = require('mysql2/promise');
 
-const app = express();
+// SSL handling helper (รองรับ raw PEM, escaped \n, และ base64)
+function getCaFromEnv() {
+  const raw = process.env.DB_CERTIFICATE_CA;
+  if (!raw) return undefined;
+  let v = raw.trim();
+  if (v.includes('-----BEGIN CERTIFICATE-----')) {
+    return v.replace(/\\n/g, '\n');
+  }
+  const base64Like = /^[A-Za-z0-9+/=\r\n]+$/.test(v);
+  if (base64Like) {
+    try {
+      const decoded = Buffer.from(v, 'base64').toString('utf8');
+      if (decoded.includes('-----BEGIN CERTIFICATE-----')) return decoded;
+      return v.replace(/\\n/g, '\n');
+    } catch (e) {
+      return v.replace(/\\n/g, '\n');
+    }
+  }
+  return v.replace(/\\n/g, '\n');
+}
 
-// ตั้งค่า CORS — เปลี่ยนค่า origin ให้ตรงกับ front-end domain(s)
-const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || 'https://web-ge-nu-9943-602f2zfrb-chlisas-projects.vercel.app';
+const ca = getCaFromEnv();
+const sslConfig = ca ? { rejectUnauthorized: true, ca } : undefined;
 
-const corsOptions = {
-  origin: FRONTEND_ORIGIN,   // หรือเป็น array of origins ถ้ามีหลาย
-  methods: ['GET','POST','PUT','DELETE','OPTIONS'],
-  allowedHeaders: ['Content-Type','Authorization','X-Requested-With'],
-  credentials: true,         // สำคัญมากถ้าใช้ cookie
-  preflightContinue: false,
-  optionsSuccessStatus: 204
+const poolConfig = {
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
+  port: process.env.DB_PORT ? Number(process.env.DB_PORT) : undefined,
+  ssl: sslConfig,
+  waitForConnections: true,
+  connectionLimit: process.env.DB_CONN_LIMIT ? Number(process.env.DB_CONN_LIMIT) : 7,
+  queueLimit: 0
 };
 
-app.use(cors(corsOptions));
-app.options('*', cors(corsOptions)); // ตอบ preflight สำหรับทุก route
+let pool;
+try {
+  pool = mysql.createPool(poolConfig);
+  console.log(`✅ MySQL pool created for ${process.env.DB_HOST}/${process.env.DB_NAME}`);
+} catch (err) {
+  console.error('❌ Error creating MySQL pool', err);
+  throw err;
+}
 
-app.use(express.json());
-app.use(cookieParser());
-// ... rest of your middleware & routes
+module.exports = pool;
